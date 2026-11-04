@@ -210,11 +210,6 @@
         height: 100%;
         min-width: 560px;
       }
-      .synthetic {
-        color: #9b6900;
-        font-size: 10px;
-        font-weight: 600;
-      }
       .table-wrap {
         overflow: auto;
         border: 1px solid var(--l);
@@ -283,6 +278,10 @@
       }
       .audience-grid {
         grid-template-columns: repeat(3, 1fr);
+      }
+      .audience-grid #sources {
+        max-height: 380px;
+        overflow-y: auto;
       }
       @media (max-width: 1000px) {
         .audience-grid {
@@ -698,18 +697,18 @@
     <header>
       <div>
         <h1>Samsung QBR Dashboard</h1>
-        <p>Database, engagement, audience, campaign and form performance</p>
+        <p>Database, consent, marketable, campaign and form performance</p>
       </div>
     </header>
     <main class="wrap">
-      <!--<div class="note">
-        
-      </div>-->
+      <div class="note" id="dataStatus" role="status" aria-live="polite">
+        Loading dashboard data...
+      </div>
       <div class="filters">
         <div class="f">
           <label>Year</label
-          ><select>
-            <option>FY26</option>
+          ><select id="year">
+            <option>All Years</option>
           </select>
         </div>
         <div class="f">
@@ -764,15 +763,10 @@
         <div class="grid summary">
           <div class="card">
             <div class="title">Total Counts</div>
-            <div class="sub">Core QBR volumes for selected scope</div>
+            <div class="sub">Metrics from populated workbook sheets</div>
             <div id="totals" class="kgrid"></div>
-            <div class="title" style="margin-top: 16px">
-              Marketable Breakdown
-            </div>
-            <div class="sub">
-              Double Opt-in is 72% of filtered SEG Marketable contacts only;
-              other regions are blank
-            </div>
+            <div class="title" style="margin-top: 16px">Consent Breakdown</div>
+            <div class="sub">Double Opt-in is not provided in the workbook</div>
             <div id="execMarketBreakdown"></div>
           </div>
           <div class="card">
@@ -788,18 +782,20 @@
           </div>
           <div class="card">
             <div class="title">Engagement Flow</div>
+            <div class="sub">
+              Engaged Contacts from the workbook; repeated counts should be
+              verified.
+            </div>
             <div id="engage"></div>
           </div>
         </div>
         <div class="grid snapshots">
           <div class="card">
             <div class="title">Campaign Snapshot</div>
-            <div class="sub synthetic">Synthetic demonstration metrics</div>
             <div id="campaignSnap" class="kgrid"></div>
           </div>
           <div class="card">
             <div class="title">Form Snapshot</div>
-            <div class="sub synthetic">Synthetic demonstration metrics</div>
             <div id="formSnap" class="kgrid"></div>
           </div>
         </div>
@@ -809,12 +805,10 @@
           class="card"
           style="margin-top: 14px; border-left: 4px solid #00a6a6"
         >
-          <div class="title">SEG Double Opt-in Logic</div>
+          <div class="title">Double Opt-in Availability</div>
           <div class="sub">
-            Prototype rule: Double Opt-in = 72% of filtered SEG Marketable
-            contacts. Opt-in remains an independent count. For other regions,
-            Double Opt-in is blank. When All Regions is selected, only SEG
-            contributes to Double Opt-in.
+            The workbook does not provide a populated Double Opt-in sheet. No
+            estimate is shown.
           </div>
         </div>
         <div id="consentKpis" class="kgrid" style="margin-top: 14px"></div>
@@ -822,7 +816,7 @@
           <div class="card">
             <div class="title">Consent Trend</div>
             <div class="sub">
-              Opt-in, opt-out, neither and SEG Double Opt-in status
+              Opt-in, opt-out, and neither from the workbook
             </div>
             <div id="consentTrend" class="chart"></div>
           </div>
@@ -837,6 +831,10 @@
         </div>
       </section>
       <section class="section" id="marketable">
+        <div class="sub" style="margin-top: 14px">
+          Without-I4B and Non-eStore values are included, but repeat across
+          workbook rows and should be verified. I4B data is unavailable.
+        </div>
         <div id="marketKpis" class="kgrid" style="margin-top: 14px"></div>
         <div class="grid charts">
           <div class="card">
@@ -854,6 +852,11 @@
         </div>
       </section>
       <section class="section" id="estore">
+        <div class="sub" style="margin-top: 14px">
+          Showing the workbook values as requested. Counts repeat across months
+          and regions, and product breakdowns do not reconcile to the totals;
+          verify these figures before using them as actual results.
+        </div>
         <div id="estoreKpis" class="kgrid" style="margin-top: 14px"></div>
         <div class="grid charts">
           <div class="card">
@@ -869,6 +872,11 @@
         </div>
       </section>
       <section class="section" id="audience">
+        <div class="sub" style="margin-top: 14px">
+          Showing the workbook values as requested. Counts repeat across months
+          and regions, and product breakdowns do not reconcile to totals; verify
+          these figures before using them as actual results.
+        </div>
         <div class="grid audience-grid" style="margin-top: 14px">
           <div class="card">
             <div class="title">Global Industry</div>
@@ -885,7 +893,7 @@
         </div>
         <div class="card" style="margin-top: 14px">
           <div class="title">Audience by Region</div>
-          <div class="sub">Marketable audience comparison</div>
+          <div class="sub">Marketable contacts by region</div>
           <div id="audienceRegion" class="chart"></div>
         </div>
       </section>
@@ -893,7 +901,7 @@
         <div class="grid charts" style="margin-top: 14px">
           <div class="card">
             <div class="title">Campaign Performance Trend</div>
-            <div class="sub synthetic">Open Rate and CTR by month</div>
+            <div class="sub">Open Rate and CTR by month</div>
             <div id="campaignGraph" class="chart"></div>
           </div>
           <div class="card">
@@ -903,7 +911,6 @@
         </div>
         <div class="card" style="margin-top: 14px">
           <div class="title">Campaign Detail</div>
-          <div class="sub synthetic">Synthetic demonstration metrics</div>
           <div class="table-wrap">
             <table>
               <thead>
@@ -928,7 +935,7 @@
         <div class="grid charts" style="margin-top: 14px">
           <div class="card">
             <div class="title">Form Submission Trend</div>
-            <div class="sub synthetic">Monthly submission volume</div>
+            <div class="sub">Monthly submission volume</div>
             <div id="formGraph" class="chart"></div>
           </div>
           <div class="card">
@@ -938,7 +945,6 @@
         </div>
         <div class="card" style="margin-top: 14px">
           <div class="title">Form Detail</div>
-          <div class="sub synthetic">Synthetic demonstration metrics</div>
           <div class="table-wrap">
             <table>
               <thead>
@@ -965,9 +971,7 @@
         </div>
         <div class="card" style="margin-top: 14px">
           <div class="title">Data Explorer</div>
-          <div class="sub">
-            Synthetic metric rows aligned to the dashboard data model
-          </div>
+          <div class="sub">Metrics from populated workbook sheets</div>
           <div class="table-wrap">
             <table>
               <thead>
@@ -992,17 +996,14 @@
     </main>
     <script>
       (() => {
-        const R = [
-            "SEUK SMB",
-            "SEBN",
-            "SEG",
-            "SESA",
-            "SEF",
-            "SEP",
-            "SEH",
-            "SEACE",
-          ],
-          M = [
+        const PRODUCTS = [
+          "Mobile",
+          "Display",
+          "Climate",
+          "Others",
+          "Non Standard",
+        ];
+        const M = [
             "January",
             "February",
             "March",
@@ -1018,85 +1019,105 @@
           ],
           $ = (x) => document.getElementById(x),
           fmt = (x) => Math.round(x).toLocaleString();
-        R.forEach((x) => $("r").add(new Option(x, x)));
         M.forEach((x) => $("m").add(new Option(x, x)));
-        const base = {
-            SEG: 148000,
-            SEF: 132000,
-            SEBN: 92000,
-            SESA: 78000,
-            "SEUK SMB": 61000,
-            SEACE: 52000,
-            SEP: 33000,
-            SEH: 28000,
+        let data = [],
+          estoreData = [],
+          availableEstoreMetrics = new Set(),
+          engagementData = {},
+          availableEngagementMetrics = new Set(),
+          marketableBreakdownData = {},
+          availableMarketableBreakdownMetrics = new Set(),
+          audienceData = {},
+          campaignsData = [],
+          formsData = [],
+          availableMetrics = new Set();
+        const metricValue = (row, metric) => {
+            if (!availableMetrics.has(metric)) return null;
+            const productIndex = PRODUCTS.indexOf($("p").value);
+            if (productIndex === -1) return row[metric] ?? null;
+            return row[`${metric}Products`]?.[productIndex] ?? null;
           },
-          data = [];
-        R.forEach((r, ri) =>
-          M.forEach((m, i) => {
-            let db = Math.round(base[r] * (1 + i * 0.012)),
-              market = Math.round(db * 0.69),
-              touch = Math.round(db * 0.48),
-              active = Math.round(db * 0.31),
-              eng = Math.round(db * 0.145);
-            data.push({
-              r,
-              m,
-              q: "Q" + (Math.floor(i / 3) + 1),
-              db,
-              market,
-              touch,
-              active,
-              eng,
-              subs: Math.round(db * 0.009),
-              unsubs: Math.round(db * 0.0017),
-              products: [
-                Math.round(db * 0.46),
-                Math.round(db * 0.25),
-                Math.round(db * 0.14),
-                Math.round(db * 0.11),
-                Math.round(db * 0.04),
-              ],
-            });
-          }),
-        );
-        const scope = () => {
-            let sh = {
-                Mobile: 0.46,
-                Display: 0.25,
-                Climate: 0.14,
-                Others: 0.11,
-                "Non Standard": 0.04,
-              },
-              f = $("p").value === "All Products" ? 1 : sh[$("p").value];
-            return data
+          estoreMetricValue = (row, metric) => {
+            if (!availableEstoreMetrics.has(metric)) return null;
+            const productIndex = PRODUCTS.indexOf($("p").value);
+            if (productIndex === -1) return row[metric] ?? null;
+            return row[`${metric}Products`]?.[productIndex] ?? null;
+          },
+          engagementMetricValue = (row, metric) => {
+            if (!availableEngagementMetrics.has(metric)) return null;
+            const productIndex = PRODUCTS.indexOf($("p").value);
+            if (productIndex === -1) return row.value ?? null;
+            return row.products?.[productIndex] ?? null;
+          },
+          marketableBreakdownValue = (row, metric) => {
+            if (!availableMarketableBreakdownMetrics.has(metric)) return null;
+            const productIndex = PRODUCTS.indexOf($("p").value);
+            if (productIndex === -1) return row.value ?? null;
+            return row.products?.[productIndex] ?? null;
+          },
+          scope = () =>
+            data
               .filter(
                 (x) =>
+                  ($("year").value === "All Years" ||
+                    x.year === $("year").value) &&
                   ($("r").value === "All Regions" || x.r === $("r").value) &&
                   ($("m").value === "All Months" || x.m === $("m").value) &&
                   ($("q").value === "All Quarters" || x.q === $("q").value),
               )
               .map((x) => ({
                 ...x,
-                db: x.db * f,
-                market: x.market * f,
-                touch: x.touch * f,
-                active: x.active * f,
-                eng: x.eng * f,
-                subs: x.subs * f,
-                unsubs: x.unsubs * f,
-                products: x.products.map((v) => v * f),
-              }));
-          },
-          sum = (k) => scope().reduce((a, b) => a + b[k], 0),
+                ...Object.fromEntries(
+                  [
+                    "db",
+                    "market",
+                    "optIn",
+                    "optOut",
+                    "neither",
+                    "newContacts",
+                  ].map((metric) => [metric, metricValue(x, metric)]),
+                ),
+              })),
+          sum = (key, rows = scope()) =>
+            rows.reduce((total, row) => total + (row[key] ?? 0), 0),
+          selectedRows = (rows) =>
+            rows.filter(
+              (x) =>
+                ($("year").value === "All Years" ||
+                  x.year === $("year").value) &&
+                ($("r").value === "All Regions" || x.region === $("r").value) &&
+                ($("m").value === "All Months" || x.month === $("m").value) &&
+                ($("q").value === "All Quarters" || x.quarter === $("q").value),
+            ),
           k = (l, v) =>
             `<div class="k"><div class="kl">${l}</div><div class="kv">${v}</div></div>`;
+        function escapeHtml(value) {
+          return String(value ?? "").replace(
+            /[&<>"']/g,
+            (char) =>
+              ({
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#39;",
+              })[char],
+          );
+        }
+        function populateFilter(id, allLabel, values) {
+          const select = $(id);
+          select.replaceChildren(new Option(allLabel, allLabel));
+          [...new Set(values)].forEach((value) => {
+            select.add(new Option(value, value));
+          });
+        }
         function bars(id, a) {
           let mx = Math.max(...a.map((x) => x[1]), 1);
           if (!$(id)) return;
           $(id).innerHTML = a
             .map(
               (x) =>
-                `<div class="bar"><span>${x[0]}</span><div class="track"><div class="fill" style="width:${(x[1] / mx) * 100}%"></div></div><b>${fmt(x[1])}</b></div>`,
+                `<div class="bar"><span>${escapeHtml(x[0])}</span><div class="track"><div class="fill" style="width:${(x[1] / mx) * 100}%"></div></div><b>${fmt(x[1])}</b></div>`,
             )
             .join("");
         }
@@ -1156,308 +1177,531 @@
               .reduce((a, b) => a + fn(b), 0),
           );
         }
-        function render() {
-          let db = sum("db"),
-            market = sum("market"),
-            touch = sum("touch"),
-            active = sum("active"),
-            eng = sum("eng"),
-            net = sum("subs") - sum("unsubs");
-          let segMarket = scope()
-              .filter((x) => x.r === "SEG")
-              .reduce((a, b) => a + b.market, 0),
-            doubleOptIn = Math.round(segMarket * 0.72),
-            otherMarketable = segMarket - doubleOptIn,
-            doiAvailable = segMarket > 0;
-          $("totals").innerHTML = [
-            ["Total Database", db],
-            ["Marketable", market],
-            ["Touched", touch],
-            ["Active", active],
-            ["Engaged", eng],
-            ["Net Subscribers", net],
-          ]
-            .map((x) => k(x[0], fmt(x[1])))
-            .join("");
-          if (doiAvailable) {
-            bars("execMarketBreakdown", [
-              ["Double Opt-in (SEG)", doubleOptIn],
-              ["Other SEG Marketable", otherMarketable],
-            ]);
-          } else {
-            $("execMarketBreakdown").innerHTML =
-              '<div class="sub">Double Opt-in: blank for this region</div>';
+        function sumRecords(rows, key) {
+          return rows.reduce((total, row) => total + (row[key] ?? 0), 0);
+        }
+        function campaignRate(row) {
+          return {
+            open: row.delivered
+              ? ((row.uniqueOpens ?? 0) / row.delivered) * 100
+              : 0,
+            ctr: row.sent ? ((row.clicks ?? 0) / row.sent) * 100 : 0,
+          };
+        }
+        function unavailable(id, message) {
+          if ($(id)) $(id).innerHTML = `<div class="sub">${message}</div>`;
+        }
+        function renderAudienceDimension(elementId, dimension) {
+          const rows = selectedRows(audienceData[dimension] || []),
+            productIndex = PRODUCTS.indexOf($("p").value),
+            totals = new Map();
+          rows.forEach((row) => {
+            const value =
+              productIndex === -1
+                ? row.value
+                : (row.products?.[productIndex] ?? 0);
+            totals.set(row.category, (totals.get(row.category) || 0) + value);
+          });
+          if (!rows.length) {
+            unavailable(elementId, "No audience data for this filter.");
+            return;
           }
-          let ps = [0, 0, 0, 0, 0];
-          scope().forEach((x) => x.products.forEach((v, i) => (ps[i] += v)));
           bars(
-            "products",
-            ["Mobile", "Display", "Climate", "Others", "Non Standard"].map(
-              (x, i) => [x, ps[i]],
-            ),
+            elementId,
+            [...totals.entries()].sort((a, b) => b[1] - a[1]),
           );
-          bars("engage", [
-            ["Touched", touch],
-            ["Active", active],
-            ["Engaged", eng],
-          ]);
-          line();
-          let campaigns = Math.max(1, scope().length * 3),
-            sent = Math.round(db * 0.15),
-            del = Math.round(sent * 0.982),
-            open = 0.258,
-            ctr = 0.038,
-            un = Math.round(sent * 0.0015);
-          $("campaignSnap").innerHTML = [
-            ["Campaigns", campaigns],
-            ["Emails Sent", fmt(sent)],
-            ["Delivered", fmt(del)],
-            ["Open Rate", (open * 100).toFixed(1) + "%"],
-            ["CTR", (ctr * 100).toFixed(1) + "%"],
-            ["Unsubs", fmt(un)],
-          ]
-            .map((x) => k(x[0], x[1]))
-            .join("");
-          let sub = Math.round(db * 0.0039),
-            unique = Math.round(sub * 0.91),
-            newc = Math.round(sub * 0.38),
-            marketC = Math.round(sub * 0.27);
-          $("formSnap").innerHTML = [
-            ["Submissions", fmt(sub)],
-            ["Unique Submitters", fmt(unique)],
-            ["New Contacts", fmt(newc)],
-            ["Marketable Created", fmt(marketC)],
-          ]
-            .map((x) => k(x[0], x[1]))
-            .join("");
-          let opt = Math.round(db * 0.61),
-            optout = Math.round(db * 0.115),
-            neither = db - opt - optout;
-          if ($("doiConsentNote")) $("doiConsentNote").remove();
-          $("consentKpis").innerHTML = [
-            ["Opt-in", fmt(opt)],
-            ["Opt-out", fmt(optout)],
-            ["Neither", fmt(neither)],
-            ["Double Opt-in (SEG only)", doiAvailable ? fmt(doubleOptIn) : ""],
-          ]
-            .map((x) => k(x[0], x[1]))
-            .join("");
-          $("consentKpis").insertAdjacentHTML(
-            "afterend",
-            `<div class="sub" id="doiConsentNote" style="margin-top:8px;color:${doiAvailable ? "#008b8b" : "#9b6900"}">${doiAvailable ? "Double Opt-in shown from SEG marketable contacts only." : "Double Opt-in is blank because SEG is not in the selected region scope."}</div>`,
-          );
-          lineMulti("consentTrend", [
-            { v: monthly((x) => x.db * 0.61), c: "#16a36a" },
-            { v: monthly((x) => x.db * 0.115), c: "#dc4c64" },
-            { v: monthly((x) => x.db * 0.275), c: "#f5a623" },
-            {
-              v: M.map((m) =>
-                scope()
-                  .filter((x) => x.r === "SEG" && x.m === m)
-                  .reduce((a, b) => a + b.market * 0.72, 0),
+        }
+        async function loadDashboardData() {
+          const status = $("dataStatus");
+          try {
+            const response = await fetch("./dashboard-data.json", {
+              cache: "no-store",
+            });
+            if (!response.ok) {
+              throw new Error(
+                `Could not load dashboard-data.json (HTTP ${response.status}).`,
+              );
+            }
+            const payload = await response.json();
+            if (
+              !Array.isArray(payload.records) ||
+              !Array.isArray(payload.estore) ||
+              !Array.isArray(payload.estoreMetrics) ||
+              !payload.engagement ||
+              !Array.isArray(payload.engagement.engaged) ||
+              !Array.isArray(payload.engagementMetrics) ||
+              !payload.marketableBreakdown ||
+              !Array.isArray(payload.marketableBreakdown.i4b) ||
+              !Array.isArray(payload.marketableBreakdown.withoutI4B) ||
+              !Array.isArray(payload.marketableBreakdown.nonEstore) ||
+              !Array.isArray(payload.marketableBreakdownMetrics) ||
+              !payload.audienceDimensions ||
+              !Array.isArray(payload.audienceDimensions.industry) ||
+              !Array.isArray(payload.audienceDimensions.employees) ||
+              !Array.isArray(payload.audienceDimensions.sources) ||
+              !Array.isArray(payload.campaigns) ||
+              !Array.isArray(payload.forms) ||
+              !Array.isArray(payload.metrics) ||
+              !Array.isArray(payload.sheetAudit)
+            ) {
+              throw new Error(
+                "dashboard-data.json has an invalid data structure.",
+              );
+            }
+            data = payload.records;
+            estoreData = payload.estore;
+            availableEstoreMetrics = new Set(payload.estoreMetrics);
+            engagementData = payload.engagement;
+            availableEngagementMetrics = new Set(payload.engagementMetrics);
+            marketableBreakdownData = payload.marketableBreakdown;
+            availableMarketableBreakdownMetrics = new Set(
+              payload.marketableBreakdownMetrics,
+            );
+            audienceData = payload.audienceDimensions;
+            campaignsData = payload.campaigns;
+            formsData = payload.forms;
+            availableMetrics = new Set(payload.metrics);
+            populateFilter(
+              "year",
+              "All Years",
+              data.map((record) => record.year),
+            );
+            populateFilter(
+              "r",
+              "All Regions",
+              data.map((record) => record.r),
+            );
+            const includedSheets = payload.sheetAudit.filter(
+                (sheet) =>
+                  sheet.status === "loaded" ||
+                  sheet.status === "included-placeholder",
               ),
-              c: "#00a6a6",
-            },
-          ]);
-          bars(
-            "consentMix",
-            [
+              excludedSheets = payload.sheetAudit.filter(
+                (sheet) =>
+                  sheet.status !== "loaded" &&
+                  sheet.status !== "included-placeholder",
+              );
+            status.textContent = `Loaded ${data.length} database rows, ${estoreData.length} eStore rows, ${engagementData.engaged.length} engaged-contact rows, ${marketableBreakdownData.i4b.length} I4B rows, ${marketableBreakdownData.withoutI4B.length} without-I4B rows, ${marketableBreakdownData.nonEstore.length} non-eStore rows, ${campaignsData.length} campaigns, ${formsData.length} forms, and ${Object.values(audienceData).reduce((total, rows) => total + rows.length, 0)} audience rows. Skipped ${payload.missingDatabaseRows} blank database rows. ${includedSheets.length} of ${payload.sheetAudit.length} workbook sheets are included; ${excludedSheets.length} blank or unmapped sheets are excluded.`;
+            status.title = payload.sheetAudit
+              .filter((sheet) => sheet.status !== "loaded")
+              .map(
+                (sheet) =>
+                  `${sheet.name}: ${sheet.status === "included-placeholder" ? "included; values repeat across rows" : sheet.status}`,
+              )
+              .join("\n");
+            render();
+          } catch (error) {
+            status.setAttribute("role", "alert");
+            status.textContent = `Dashboard data could not be loaded: ${error.message} Serve index.html and dashboard-data.json from the same web location.`;
+          }
+        }
+        function render() {
+          const scoped = scope(),
+            db = sum("db", scoped),
+            market = sum("market", scoped),
+            opt = sum("optIn", scoped),
+            optout = sum("optOut", scoped),
+            neither = sum("neither", scoped),
+            i4bRows = selectedRows(marketableBreakdownData.i4b || []),
+            i4b = i4bRows.reduce(
+              (total, row) =>
+                total + (marketableBreakdownValue(row, "i4b") ?? 0),
+              0,
+            ),
+            withoutI4BRows = selectedRows(
+              marketableBreakdownData.withoutI4B || [],
+            ),
+            withoutI4B = withoutI4BRows.reduce(
+              (total, row) =>
+                total + (marketableBreakdownValue(row, "withoutI4B") ?? 0),
+              0,
+            ),
+            nonEstoreRows = selectedRows(
+              marketableBreakdownData.nonEstore || [],
+            ),
+            nonEstore = nonEstoreRows.reduce(
+              (total, row) =>
+                total + (marketableBreakdownValue(row, "nonEstore") ?? 0),
+              0,
+            ),
+            scopedEstore = selectedRows(estoreData),
+            campaignRows = selectedRows(campaignsData),
+            formRows = selectedRows(formsData),
+            scopeValue = (value) => (scoped.length ? fmt(value) : "No data"),
+            metricLabels = [
+              ["db", "Total Database"],
+              ["market", "Marketable Database"],
+              ["optIn", "Opt-in Contacts"],
+              ["optOut", "Opt-out Contacts"],
+              ["neither", "Neither Opt-in/Out"],
+              ["newContacts", "New Contacts"],
+            ];
+          $("totals").innerHTML = [
+            ["Total Database", db, "db"],
+            ["Marketable", market, "market"],
+            ["Opt-in", opt, "optIn"],
+            ["Opt-out", optout, "optOut"],
+            ["Neither", neither, "neither"],
+            ["New Contacts", sum("newContacts", scoped), "newContacts"],
+          ]
+            .map((x) =>
+              k(
+                x[0],
+                availableMetrics.has(x[2])
+                  ? scopeValue(x[1])
+                  : "Not in workbook",
+              ),
+            )
+            .join("");
+          if (scoped.length) {
+            bars("execMarketBreakdown", [
               ["Opt-in", opt],
               ["Opt-out", optout],
               ["Neither", neither],
-            ].concat(
-              doiAvailable ? [["Double Opt-in (SEG)", doubleOptIn]] : [],
+            ]);
+          } else {
+            unavailable("execMarketBreakdown", "No data for this filter.");
+          }
+          const productTotals = PRODUCTS.map((_, index) =>
+            scoped.reduce(
+              (total, row) => total + (row.dbProducts?.[index] ?? 0),
+              0,
             ),
           );
-          let i4b = Math.round(market * 0.26),
-            without = market - i4b,
-            nonestore = Math.round(market * 0.82);
-          $("marketKpis").innerHTML = [
-            ["Total Marketable", market],
-            ["I4B", i4b],
-            ["Without I4B", without],
-            ["Non-eStore", nonestore],
+          if (scoped.length) {
+            bars(
+              "products",
+              PRODUCTS.map((product, index) => [product, productTotals[index]]),
+            );
+            line();
+          } else {
+            unavailable("products", "No data for this filter.");
+            unavailable("trend", "No data for this filter.");
+          }
+          const engagedRows = selectedRows(engagementData.engaged || []);
+          if (engagedRows.length) {
+            bars("engage", [
+              [
+                "Engaged Contacts",
+                engagedRows.reduce(
+                  (total, row) =>
+                    total + (engagementMetricValue(row, "engaged") ?? 0),
+                  0,
+                ),
+              ],
+            ]);
+          } else {
+            unavailable("engage", "No engagement data for this filter.");
+          }
+          const campaignSent = sumRecords(campaignRows, "sent"),
+            delivered = sumRecords(campaignRows, "delivered"),
+            uniqueOpens = sumRecords(campaignRows, "uniqueOpens"),
+            clicks = sumRecords(campaignRows, "clicks"),
+            unsubscribes = sumRecords(campaignRows, "unsubscribes"),
+            campaignOpenRate = delivered ? (uniqueOpens / delivered) * 100 : 0,
+            campaignCtr = campaignSent ? (clicks / campaignSent) * 100 : 0;
+          $("campaignSnap").innerHTML = [
+            ["Campaigns", campaignRows.length],
+            ["Emails Sent", fmt(campaignSent)],
+            ["Delivered", fmt(delivered)],
+            ["Open Rate", campaignOpenRate.toFixed(1) + "%"],
+            ["CTR", campaignCtr.toFixed(1) + "%"],
+            ["Unsubs", fmt(unsubscribes)],
           ]
-            .map((x) => k(x[0], fmt(x[1])))
+            .map((x) => k(x[0], x[1]))
             .join("");
-          lineMulti("marketTrend", [
-            { v: monthly((x) => x.market), c: "#1267e8" },
-            {
-              v: M.map((m) =>
-                scope()
-                  .filter((x) => x.r === "SEG" && x.m === m)
-                  .reduce((a, b) => a + b.market * 0.72, 0),
-              ),
-              c: "#00a6a6",
-            },
-            { v: monthly((x) => x.market * 0.26), c: "#7c4dff" },
-          ]);
-          bars(
-            "marketMix",
-            (doiAvailable
-              ? [
-                  ["Double Opt-in (SEG)", doubleOptIn],
-                  ["Other SEG Marketable", otherMarketable],
-                ]
-              : []
-            ).concat([
-              ["I4B", i4b],
-              ["Without I4B", without],
-              ["Non-eStore", nonestore],
-            ]),
-          );
-          let reg = Math.round(db * 0.092),
-            sale = Math.round(db * 0.031),
-            aband = Math.round(db * 0.018);
-          $("estoreKpis").innerHTML = [
-            ["Registered", reg],
-            ["Sale", sale],
-            ["Abandoned", aband],
-            ["Sale Rate", (reg ? (sale / reg) * 100 : 0).toFixed(1) + "%"],
+          const submissions = sumRecords(formRows, "submissions"),
+            uniqueSubmissions = sumRecords(formRows, "uniqueSubmissions"),
+            newFormContacts = sumRecords(formRows, "newContacts"),
+            marketableContacts = sumRecords(formRows, "marketableContacts");
+          $("formSnap").innerHTML = [
+            ["Submissions", fmt(submissions)],
+            ["Unique Submitters", fmt(uniqueSubmissions)],
+            ["New Contacts", fmt(newFormContacts)],
+            ["Marketable Created", fmt(marketableContacts)],
           ]
-            .map((x) => k(x[0], typeof x[1] === "number" ? fmt(x[1]) : x[1]))
+            .map((x) => k(x[0], x[1]))
             .join("");
-          lineMulti("estoreTrend", [
-            { v: monthly((x) => x.db * 0.092), c: "#1267e8" },
-            { v: monthly((x) => x.db * 0.031), c: "#16a36a" },
-            { v: monthly((x) => x.db * 0.018), c: "#dc4c64" },
-          ]);
-          bars("estoreMix", [
-            ["Registered", reg],
-            ["Sale", sale],
-            ["Abandoned", aband],
-          ]);
-          bars("industry", [
-            ["Professional Services", market * 0.18],
-            ["Retail", market * 0.14],
-            ["Manufacturing", market * 0.13],
-            ["Finance", market * 0.11],
-            ["Healthcare", market * 0.09],
-            ["Other", market * 0.35],
-          ]);
-          bars("employees", [
-            ["<50", market * 0.17],
-            ["50-99", market * 0.15],
-            ["100-199", market * 0.18],
-            ["200-499", market * 0.19],
-            ["500-999", market * 0.14],
-            ["1000+", market * 0.12],
-            ["Blank", market * 0.05],
-          ]);
-          bars("sources", [
-            ["MCAE", market * 0.2],
-            ["Samsung.com", market * 0.18],
-            ["eStore", market * 0.13],
-            ["LinkedIn", market * 0.09],
-            ["Data Upload", market * 0.09],
-            ["Knox.com", market * 0.08],
-            ["Other", market * 0.23],
-          ]);
-          let er = [];
-          scope().forEach((x) =>
-            [
-              ["Total Database", x.db],
-              ["Marketable Database", x.market],
-              ["Touched Contacts", x.touch],
-              ["Active Contacts", x.active],
-              ["Engaged Contacts", x.eng],
-            ].forEach((z) =>
-              er.push(
-                `<tr><td>${z[0]}</td><td>${x.q}</td><td>${x.m}</td><td>${x.r}</td><td>${fmt(z[1])}</td><td>${fmt(z[1] * 0.46)}</td><td>${fmt(z[1] * 0.25)}</td><td>${fmt(z[1] * 0.14)}</td><td>${fmt(z[1] * 0.11)}</td><td>${fmt(z[1] * 0.04)}</td></tr>`,
-              ),
-            ),
-          );
-          $("explorerRows").innerHTML = er.slice(0, 100).join("");
-          bars(
-            "consentRates",
-            [
+          $("consentKpis").innerHTML = [
+            ["Opt-in", scopeValue(opt)],
+            ["Opt-out", scopeValue(optout)],
+            ["Neither", scopeValue(neither)],
+            ["Double Opt-in", "Not in workbook"],
+          ]
+            .map((x) => k(x[0], x[1]))
+            .join("");
+          if (scoped.length) {
+            lineMulti("consentTrend", [
+              { v: monthly((x) => x.optIn ?? 0), c: "#16a36a" },
+              { v: monthly((x) => x.optOut ?? 0), c: "#dc4c64" },
+              { v: monthly((x) => x.neither ?? 0), c: "#f5a623" },
+            ]);
+            bars("consentMix", [
+              ["Opt-in", opt],
+              ["Opt-out", optout],
+              ["Neither", neither],
+            ]);
+            lineMulti("marketTrend", [
+              { v: monthly((x) => x.market ?? 0), c: "#1267e8" },
+              ...(i4bRows.length
+                ? [
+                    {
+                      v: M.map((month) =>
+                        i4bRows
+                          .filter((row) => row.month === month)
+                          .reduce(
+                            (total, row) =>
+                              total +
+                              (marketableBreakdownValue(row, "i4b") ?? 0),
+                            0,
+                          ),
+                      ),
+                      c: "#16a36a",
+                    },
+                  ]
+                : []),
+              {
+                v: M.map((month) =>
+                  withoutI4BRows
+                    .filter((row) => row.month === month)
+                    .reduce(
+                      (total, row) =>
+                        total +
+                        (marketableBreakdownValue(row, "withoutI4B") ?? 0),
+                      0,
+                    ),
+                ),
+                c: "#7c4dff",
+              },
+              {
+                v: M.map((month) =>
+                  nonEstoreRows
+                    .filter((row) => row.month === month)
+                    .reduce(
+                      (total, row) =>
+                        total +
+                        (marketableBreakdownValue(row, "nonEstore") ?? 0),
+                      0,
+                    ),
+                ),
+                c: "#f5a623",
+              },
+            ]);
+            bars("marketMix", [
+              ["Marketable Database", market],
+              ...(i4bRows.length ? [["I4B", i4b]] : []),
+              ["Without I4B", withoutI4B],
+              ["Non-eStore", nonEstore],
+            ]);
+            bars("consentRates", [
               ["Opt-in Rate", db ? (opt / db) * 100 : 0],
               ["Opt-out Rate", db ? (optout / db) * 100 : 0],
               ["Neither Rate", db ? (neither / db) * 100 : 0],
-            ].concat(doiAvailable ? [["Double Opt-in Share (SEG)", 72]] : []),
-          );
-          bars(
-            "marketRates",
-            [["Marketable Rate", db ? (market / db) * 100 : 0]]
-              .concat(
-                doiAvailable
-                  ? [
-                      ["Double Opt-in Share (SEG)", 72],
-                      ["Other SEG Marketable Share", 28],
-                    ]
-                  : [],
-              )
-              .concat([
-                ["I4B Share", market ? (i4b / market) * 100 : 0],
-                ["Non-eStore Share", market ? (nonestore / market) * 100 : 0],
-              ]),
-          );
-          bars("estoreRates", [
-            ["Sale / Registered", reg ? (sale / reg) * 100 : 0],
-            ["Abandoned / Registered", reg ? (aband / reg) * 100 : 0],
-          ]);
-          let showRegions = $("r").value === "All Regions" ? R : [$("r").value],
-            prodShare = {
-              "All Products": 1,
-              Mobile: 0.46,
-              Display: 0.25,
-              Climate: 0.14,
-              Others: 0.11,
-              "Non Standard": 0.04,
-            }[$("p").value],
-            regionSeries = showRegions.map((rr) =>
-              data
-                .filter(
-                  (x) =>
-                    x.r === rr &&
-                    ($("m").value === "All Months" || x.m === $("m").value) &&
-                    ($("q").value === "All Quarters" || x.q === $("q").value),
-                )
-                .reduce((a, b) => a + b.market * prodShare, 0),
-            );
-          lineMulti("audienceRegion", [
-            {
-              v: regionSeries.concat(Array(4).fill(0)).slice(0, 12),
-              c: "#1267e8",
-            },
-          ]);
-          let campaignOpen = M.map((m, i) =>
-              scope().some((x) => x.m === m) ? 23.5 + (i % 4) * 1.1 : 0,
+            ]);
+            bars("marketRates", [
+              ["Marketable Rate", db ? (market / db) * 100 : 0],
+            ]);
+          } else {
+            [
+              "consentTrend",
+              "consentMix",
+              "consentRates",
+              "marketTrend",
+              "marketMix",
+              "marketRates",
+            ].forEach((id) => unavailable(id, "No data for this filter."));
+          }
+          $("marketKpis").innerHTML = [
+            ["Total Marketable", scopeValue(market)],
+            ["I4B", i4bRows.length ? fmt(i4b) : "Not available"],
+            [
+              "Without I4B",
+              withoutI4BRows.length ? fmt(withoutI4B) : "Not available",
+            ],
+            [
+              "Non-eStore",
+              nonEstoreRows.length ? fmt(nonEstore) : "Not available",
+            ],
+          ]
+            .map((x) => k(x[0], typeof x[1] === "number" ? fmt(x[1]) : x[1]))
+            .join("");
+          const registered = scopedEstore.reduce(
+              (total, row) =>
+                total + (estoreMetricValue(row, "registered") ?? 0),
+              0,
             ),
-            campaignCtr = M.map((m, i) =>
-              scope().some((x) => x.m === m) ? 3.1 + (i % 3) * 0.3 : 0,
+            sale = scopedEstore.reduce(
+              (total, row) => total + (estoreMetricValue(row, "sale") ?? 0),
+              0,
+            ),
+            abandoned = scopedEstore.reduce(
+              (total, row) =>
+                total + (estoreMetricValue(row, "abandoned") ?? 0),
+              0,
+            ),
+            estoreTotals = { registered, sale, abandoned },
+            estoreLabels = {
+              registered: "Registered",
+              sale: "Sale",
+              abandoned: "Abandoned",
+            };
+          $("estoreKpis").innerHTML = [
+            ["Registered", registered],
+            ["Sale", sale],
+            ["Abandoned", abandoned],
+            [
+              "Sale Rate",
+              registered ? ((sale / registered) * 100).toFixed(1) + "%" : "0%",
+            ],
+          ]
+            .map((x) =>
+              k(
+                x[0],
+                scopedEstore.length
+                  ? typeof x[1] === "number"
+                    ? fmt(x[1])
+                    : x[1]
+                  : "No data",
+              ),
+            )
+            .join("");
+          const estoreMonthly = (metric) =>
+            M.map((month) =>
+              scopedEstore
+                .filter((row) => row.month === month)
+                .reduce(
+                  (total, row) => total + (estoreMetricValue(row, metric) ?? 0),
+                  0,
+                ),
             );
+          if (scopedEstore.length) {
+            lineMulti("estoreTrend", [
+              { v: estoreMonthly("registered"), c: "#1267e8" },
+              { v: estoreMonthly("sale"), c: "#16a36a" },
+              { v: estoreMonthly("abandoned"), c: "#dc4c64" },
+            ]);
+            bars(
+              "estoreMix",
+              Object.entries(estoreTotals).map(([metric, value]) => [
+                estoreLabels[metric],
+                value,
+              ]),
+            );
+            bars("estoreRates", [
+              ["Sale / Registered", registered ? (sale / registered) * 100 : 0],
+              [
+                "Abandoned / Registered",
+                registered ? (abandoned / registered) * 100 : 0,
+              ],
+            ]);
+          } else {
+            ["estoreTrend", "estoreMix", "estoreRates"].forEach((id) =>
+              unavailable(id, "No eStore data for this filter."),
+            );
+          }
+          renderAudienceDimension("industry", "industry");
+          renderAudienceDimension("employees", "employees");
+          renderAudienceDimension("sources", "sources");
+          if (scoped.length) {
+            const marketableByRegion = new Map();
+            scoped.forEach((row) => {
+              marketableByRegion.set(
+                row.r,
+                (marketableByRegion.get(row.r) || 0) + (row.market ?? 0),
+              );
+            });
+            bars(
+              "audienceRegion",
+              [...marketableByRegion.entries()].sort((a, b) => b[1] - a[1]),
+            );
+          } else {
+            unavailable(
+              "audienceRegion",
+              "No marketable data for this filter.",
+            );
+          }
+          const monthlyCampaigns = M.map((month) =>
+              campaignRows.filter((row) => row.month === month),
+            ),
+            campaignOpen = monthlyCampaigns.map((rows) => {
+              const deliveredTotal = sumRecords(rows, "delivered");
+              return deliveredTotal
+                ? (sumRecords(rows, "uniqueOpens") / deliveredTotal) * 100
+                : 0;
+            }),
+            campaignCtrByMonth = monthlyCampaigns.map((rows) => {
+              const sentTotal = sumRecords(rows, "sent");
+              return sentTotal
+                ? (sumRecords(rows, "clicks") / sentTotal) * 100
+                : 0;
+            });
           lineMulti("campaignGraph", [
             { v: campaignOpen, c: "#1267e8" },
-            { v: campaignCtr, c: "#f5a623" },
+            { v: campaignCtrByMonth, c: "#f5a623" },
           ]);
-          bars("campaignMix", [
-            ["Single Send", (campaigns * 2) / 3],
-            ["Always-On", campaigns / 3],
-          ]);
-          lineMulti("formGraph", [
-            { v: monthly((x) => x.db * 0.0039), c: "#16a36a" },
-          ]);
-          bars("formMix", [
-            ["Contact Us", sub * 0.34],
-            ["Subscription", sub * 0.28],
-            ["Asset / Content", sub * 0.23],
-            ["Event / Demo", sub * 0.15],
-          ]);
-          bars("explorerGraph", [
-            ["Total Database", db],
-            ["Marketable", market],
-            ["Touched", touch],
-            ["Active", active],
-            ["Engaged", eng],
-          ]);
-          window.__campaignRows = scope().map(
-            (x, i) =>
-              `<tr><td>${x.r}_${x.m.slice(0, 3)}_${(i % 3) + 1}</td><td>${x.r}</td><td>${x.m}</td><td>${i % 3 === 2 ? "Always-On" : "Single Send"}</td><td>${fmt(x.db * 0.05)}</td><td>${fmt(x.db * 0.0491)}</td><td>${(23.5 + (i % 5) * 1.1).toFixed(1)}%</td><td>${(3.1 + (i % 4) * 0.3).toFixed(1)}%</td></tr>`,
+          bars(
+            "campaignMix",
+            [...new Set(campaignRows.map((row) => row.type))].map((type) => [
+              type,
+              campaignRows.filter((row) => row.type === type).length,
+            ]),
           );
-          window.__formRows = scope().map(
-            (x, i) =>
-              `<tr><td>${x.r} ${["Contact Us", "Subscription", "Asset / Content", "Event / Demo"][i % 4]}</td><td>${x.r}</td><td>${x.m}</td><td>${fmt(x.db * 0.001)}</td><td>${fmt(x.db * 0.00091)}</td><td>${fmt(x.db * 0.00038)}</td></tr>`,
+          const formByMonth = M.map((month) =>
+              formRows.filter((row) => row.month === month),
+            ),
+            formByType = [...new Set(formRows.map((row) => row.type))].map(
+              (type) => [
+                type,
+                sumRecords(
+                  formRows.filter((row) => row.type === type),
+                  "submissions",
+                ),
+              ],
+            );
+          lineMulti("formGraph", [
+            {
+              v: formByMonth.map((rows) => sumRecords(rows, "submissions")),
+              c: "#16a36a",
+            },
+          ]);
+          bars("formMix", formByType);
+          if (scoped.length) {
+            bars(
+              "explorerGraph",
+              metricLabels
+                .filter(([metric]) => availableMetrics.has(metric))
+                .map(([metric, label]) => [label, sum(metric, scoped)]),
+            );
+          } else {
+            unavailable("explorerGraph", "No data for this filter.");
+          }
+          const productIndex = PRODUCTS.indexOf($("p").value);
+          let explorerRows = [];
+          scoped.forEach((row) => {
+            metricLabels
+              .filter(
+                ([metric]) =>
+                  availableMetrics.has(metric) &&
+                  row[metric] !== null &&
+                  row[metric] !== undefined,
+              )
+              .forEach(([metric, label]) => {
+                const productValues = row[`${metric}Products`] || [];
+                explorerRows.push(
+                  `<tr><td>${label}</td><td>${escapeHtml(row.q)}</td><td>${escapeHtml(row.m)}</td><td>${escapeHtml(row.r)}</td><td>${fmt(row[metric])}</td>${PRODUCTS.map((_, index) => `<td>${fmt(productIndex === -1 || productIndex === index ? (productValues[index] ?? 0) : 0)}</td>`).join("")}</tr>`,
+                );
+              });
+          });
+          $("explorerRows").innerHTML = scoped.length
+            ? explorerRows.slice(0, 100).join("")
+            : '<tr><td colspan="10">No data for this filter.</td></tr>';
+          window.__campaignRows = campaignRows.map(
+            (row) =>
+              `<tr><td>${escapeHtml(row.campaign)}</td><td>${escapeHtml(row.region)}</td><td>${escapeHtml(row.month)}</td><td>${escapeHtml(row.type)}</td><td>${fmt(row.sent)}</td><td>${fmt(row.delivered)}</td><td>${campaignRate(row).open.toFixed(1)}%</td><td>${campaignRate(row).ctr.toFixed(1)}%</td></tr>`,
+          );
+          window.__formRows = formRows.map(
+            (row) =>
+              `<tr><td>${escapeHtml(row.name)}</td><td>${escapeHtml(row.region)}</td><td>${escapeHtml(row.month)}</td><td>${fmt(row.submissions)}</td><td>${fmt(row.uniqueSubmissions)}</td><td>${fmt(row.newContacts)}</td></tr>`,
           );
           renderPaginatedTable("campaign");
           renderPaginatedTable("form");
@@ -1543,7 +1787,7 @@
           render();
         };
         $("export").onclick = () => {};
-        render();
+        loadDashboardData();
       })();
     </script>
   </body>
