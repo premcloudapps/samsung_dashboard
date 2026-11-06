@@ -742,6 +742,7 @@
             <option>Climate</option>
             <option>Others</option>
             <option>Non Standard</option>
+            <option>Blank</option>
           </select>
         </div>
         <div class="actions">
@@ -771,7 +772,9 @@
           </div>
           <div class="card">
             <div class="title">Product Split</div>
-            <div class="sub">Total Database distribution</div>
+            <div class="sub">
+              Available product values; NA cells are ignored
+            </div>
             <div id="products"></div>
           </div>
         </div>
@@ -783,8 +786,7 @@
           <div class="card">
             <div class="title">Engagement Flow</div>
             <div class="sub">
-              Engaged Contacts from the workbook; repeated counts should be
-              verified.
+              Engaged Contacts from the workbook; NA values are ignored.
             </div>
             <div id="engage"></div>
           </div>
@@ -832,8 +834,8 @@
       </section>
       <section class="section" id="marketable">
         <div class="sub" style="margin-top: 14px">
-          Without-I4B and Non-eStore values are included, but repeat across
-          workbook rows and should be verified. I4B data is unavailable.
+          Marketable breakdowns use available numeric workbook values; NA cells
+          are ignored. Verify the source data for completeness.
         </div>
         <div id="marketKpis" class="kgrid" style="margin-top: 14px"></div>
         <div class="grid charts">
@@ -853,9 +855,8 @@
       </section>
       <section class="section" id="estore">
         <div class="sub" style="margin-top: 14px">
-          Showing the workbook values as requested. Counts repeat across months
-          and regions, and product breakdowns do not reconcile to the totals;
-          verify these figures before using them as actual results.
+          Showing available numeric workbook values. NA cells are ignored;
+          verify the source data for completeness.
         </div>
         <div id="estoreKpis" class="kgrid" style="margin-top: 14px"></div>
         <div class="grid charts">
@@ -873,9 +874,8 @@
       </section>
       <section class="section" id="audience">
         <div class="sub" style="margin-top: 14px">
-          Showing the workbook values as requested. Counts repeat across months
-          and regions, and product breakdowns do not reconcile to totals; verify
-          these figures before using them as actual results.
+          Showing available numeric workbook values. NA cells are ignored;
+          verify the source data for completeness.
         </div>
         <div class="grid audience-grid" style="margin-top: 14px">
           <div class="card">
@@ -986,6 +986,7 @@
                   <th>Climate</th>
                   <th>Others</th>
                   <th>Non Standard</th>
+                  <th>Blank</th>
                 </tr>
               </thead>
               <tbody id="explorerRows"></tbody>
@@ -1002,6 +1003,7 @@
           "Climate",
           "Others",
           "Non Standard",
+          "Blank",
         ];
         const M = [
             "January",
@@ -1180,12 +1182,31 @@
         function sumRecords(rows, key) {
           return rows.reduce((total, row) => total + (row[key] ?? 0), 0);
         }
+        function sumAvailable(rows, valueForRow) {
+          const values = rows
+            .map(valueForRow)
+            .filter(
+              (value) => typeof value === "number" && Number.isFinite(value),
+            );
+          return values.length
+            ? values.reduce((total, value) => total + value, 0)
+            : null;
+        }
+        function displayAvailable(value) {
+          return typeof value === "number" && Number.isFinite(value)
+            ? fmt(value)
+            : "Not available";
+        }
         function campaignRate(row) {
           return {
-            open: row.delivered
-              ? ((row.uniqueOpens ?? 0) / row.delivered) * 100
-              : 0,
-            ctr: row.sent ? ((row.clicks ?? 0) / row.sent) * 100 : 0,
+            open:
+              row.delivered && typeof row.uniqueOpens === "number"
+                ? (row.uniqueOpens / row.delivered) * 100
+                : null,
+            ctr:
+              row.sent && typeof row.clicks === "number"
+                ? (row.clicks / row.sent) * 100
+                : null,
           };
         }
         function unavailable(id, message) {
@@ -1197,13 +1218,12 @@
             totals = new Map();
           rows.forEach((row) => {
             const value =
-              productIndex === -1
-                ? row.value
-                : (row.products?.[productIndex] ?? 0);
+              productIndex === -1 ? row.value : row.products?.[productIndex];
+            if (typeof value !== "number") return;
             totals.set(row.category, (totals.get(row.category) || 0) + value);
           });
-          if (!rows.length) {
-            unavailable(elementId, "No audience data for this filter.");
+          if (!totals.size) {
+            unavailable(elementId, "No audience values for this filter.");
             return;
           }
           bars(
@@ -1281,7 +1301,7 @@
                   sheet.status !== "loaded" &&
                   sheet.status !== "included-placeholder",
               );
-            status.textContent = `Loaded ${data.length} database rows, ${estoreData.length} eStore rows, ${engagementData.engaged.length} engaged-contact rows, ${marketableBreakdownData.i4b.length} I4B rows, ${marketableBreakdownData.withoutI4B.length} without-I4B rows, ${marketableBreakdownData.nonEstore.length} non-eStore rows, ${campaignsData.length} campaigns, ${formsData.length} forms, and ${Object.values(audienceData).reduce((total, rows) => total + rows.length, 0)} audience rows. Skipped ${payload.missingDatabaseRows} blank database rows. ${includedSheets.length} of ${payload.sheetAudit.length} workbook sheets are included; ${excludedSheets.length} blank or unmapped sheets are excluded.`;
+            status.textContent = `Loaded ${data.length} metric region-period rows, ${estoreData.length} eStore rows, ${engagementData.engaged.length} engaged-contact rows, ${marketableBreakdownData.i4b.length} I4B rows, ${marketableBreakdownData.withoutI4B.length} without-I4B rows, ${marketableBreakdownData.nonEstore.length} non-eStore rows, ${campaignsData.length} campaigns, ${formsData.length} forms, and ${Object.values(audienceData).reduce((total, rows) => total + rows.length, 0)} audience rows. NA, N/A, and Blank cells are ignored, not counted as zero. ${payload.missingDatabaseRows} database region-periods have no numeric total. ${includedSheets.length} of ${payload.sheetAudit.length} workbook sheets are included; ${excludedSheets.length} blank or unmapped sheets are excluded.`;
             status.title = payload.sheetAudit
               .filter((sheet) => sheet.status !== "loaded")
               .map(
@@ -1303,31 +1323,30 @@
             optout = sum("optOut", scoped),
             neither = sum("neither", scoped),
             i4bRows = selectedRows(marketableBreakdownData.i4b || []),
-            i4b = i4bRows.reduce(
-              (total, row) =>
-                total + (marketableBreakdownValue(row, "i4b") ?? 0),
-              0,
+            i4b = sumAvailable(i4bRows, (row) =>
+              marketableBreakdownValue(row, "i4b"),
             ),
             withoutI4BRows = selectedRows(
               marketableBreakdownData.withoutI4B || [],
             ),
-            withoutI4B = withoutI4BRows.reduce(
-              (total, row) =>
-                total + (marketableBreakdownValue(row, "withoutI4B") ?? 0),
-              0,
+            withoutI4B = sumAvailable(withoutI4BRows, (row) =>
+              marketableBreakdownValue(row, "withoutI4B"),
             ),
             nonEstoreRows = selectedRows(
               marketableBreakdownData.nonEstore || [],
             ),
-            nonEstore = nonEstoreRows.reduce(
-              (total, row) =>
-                total + (marketableBreakdownValue(row, "nonEstore") ?? 0),
-              0,
+            nonEstore = sumAvailable(nonEstoreRows, (row) =>
+              marketableBreakdownValue(row, "nonEstore"),
             ),
             scopedEstore = selectedRows(estoreData),
             campaignRows = selectedRows(campaignsData),
             formRows = selectedRows(formsData),
-            scopeValue = (value) => (scoped.length ? fmt(value) : "No data"),
+            hasMetricData = (metric) =>
+              scoped.some((row) => typeof row[metric] === "number"),
+            scopeValue = (metric, value) => {
+              if (!scoped.length) return "No data";
+              return hasMetricData(metric) ? fmt(value) : "Not available";
+            },
             metricLabels = [
               ["db", "Total Database"],
               ["market", "Marketable Database"],
@@ -1348,31 +1367,47 @@
               k(
                 x[0],
                 availableMetrics.has(x[2])
-                  ? scopeValue(x[1])
+                  ? scopeValue(x[2], x[1])
                   : "Not in workbook",
               ),
             )
             .join("");
           if (scoped.length) {
-            bars("execMarketBreakdown", [
+            const consentBreakdown = [
               ["Opt-in", opt],
               ["Opt-out", optout],
               ["Neither", neither],
-            ]);
+            ].filter(([label]) =>
+              hasMetricData(
+                { "Opt-in": "optIn", "Opt-out": "optOut", Neither: "neither" }[
+                  label
+                ],
+              ),
+            );
+            if (consentBreakdown.length) {
+              bars("execMarketBreakdown", consentBreakdown);
+            } else {
+              unavailable(
+                "execMarketBreakdown",
+                "No consent values for this filter.",
+              );
+            }
           } else {
             unavailable("execMarketBreakdown", "No data for this filter.");
           }
-          const productTotals = PRODUCTS.map((_, index) =>
-            scoped.reduce(
-              (total, row) => total + (row.dbProducts?.[index] ?? 0),
-              0,
-            ),
-          );
+          const productBreakdown = PRODUCTS.map((product, index) => [
+            product,
+            sumAvailable(scoped, (row) => row.dbProducts?.[index]),
+          ]).filter(([, value]) => value !== null);
           if (scoped.length) {
-            bars(
-              "products",
-              PRODUCTS.map((product, index) => [product, productTotals[index]]),
-            );
+            if (productBreakdown.length) {
+              bars("products", productBreakdown);
+            } else {
+              unavailable(
+                "products",
+                "No product values for this filter; NA cells are ignored.",
+              );
+            }
             line();
           } else {
             unavailable("products", "No data for this filter.");
@@ -1393,114 +1428,189 @@
           } else {
             unavailable("engage", "No engagement data for this filter.");
           }
-          const campaignSent = sumRecords(campaignRows, "sent"),
-            delivered = sumRecords(campaignRows, "delivered"),
-            uniqueOpens = sumRecords(campaignRows, "uniqueOpens"),
-            clicks = sumRecords(campaignRows, "clicks"),
-            unsubscribes = sumRecords(campaignRows, "unsubscribes"),
-            campaignOpenRate = delivered ? (uniqueOpens / delivered) * 100 : 0,
-            campaignCtr = campaignSent ? (clicks / campaignSent) * 100 : 0;
+          const campaignSent = sumAvailable(campaignRows, (row) => row.sent),
+            delivered = sumAvailable(campaignRows, (row) => row.delivered),
+            uniqueOpens = sumAvailable(campaignRows, (row) => row.uniqueOpens),
+            clicks = sumAvailable(campaignRows, (row) => row.clicks),
+            unsubscribes = sumAvailable(
+              campaignRows,
+              (row) => row.unsubscribes,
+            ),
+            campaignOpenRate =
+              delivered && uniqueOpens !== null
+                ? (uniqueOpens / delivered) * 100
+                : null,
+            campaignCtr =
+              campaignSent && clicks !== null
+                ? (clicks / campaignSent) * 100
+                : null;
           $("campaignSnap").innerHTML = [
             ["Campaigns", campaignRows.length],
-            ["Emails Sent", fmt(campaignSent)],
-            ["Delivered", fmt(delivered)],
-            ["Open Rate", campaignOpenRate.toFixed(1) + "%"],
-            ["CTR", campaignCtr.toFixed(1) + "%"],
-            ["Unsubs", fmt(unsubscribes)],
+            ["Emails Sent", displayAvailable(campaignSent)],
+            ["Delivered", displayAvailable(delivered)],
+            [
+              "Open Rate",
+              campaignOpenRate === null
+                ? "Not available"
+                : campaignOpenRate.toFixed(1) + "%",
+            ],
+            [
+              "CTR",
+              campaignCtr === null
+                ? "Not available"
+                : campaignCtr.toFixed(1) + "%",
+            ],
+            ["Unsubs", displayAvailable(unsubscribes)],
           ]
             .map((x) => k(x[0], x[1]))
             .join("");
-          const submissions = sumRecords(formRows, "submissions"),
-            uniqueSubmissions = sumRecords(formRows, "uniqueSubmissions"),
-            newFormContacts = sumRecords(formRows, "newContacts"),
-            marketableContacts = sumRecords(formRows, "marketableContacts");
+          const submissions = sumAvailable(formRows, (row) => row.submissions),
+            uniqueSubmissions = sumAvailable(
+              formRows,
+              (row) => row.uniqueSubmissions,
+            ),
+            newFormContacts = sumAvailable(formRows, (row) => row.newContacts),
+            marketableContacts = sumAvailable(
+              formRows,
+              (row) => row.marketableContacts,
+            );
           $("formSnap").innerHTML = [
-            ["Submissions", fmt(submissions)],
-            ["Unique Submitters", fmt(uniqueSubmissions)],
-            ["New Contacts", fmt(newFormContacts)],
-            ["Marketable Created", fmt(marketableContacts)],
+            ["Submissions", displayAvailable(submissions)],
+            ["Unique Submitters", displayAvailable(uniqueSubmissions)],
+            ["New Contacts", displayAvailable(newFormContacts)],
+            ["Marketable Created", displayAvailable(marketableContacts)],
           ]
             .map((x) => k(x[0], x[1]))
             .join("");
           $("consentKpis").innerHTML = [
-            ["Opt-in", scopeValue(opt)],
-            ["Opt-out", scopeValue(optout)],
-            ["Neither", scopeValue(neither)],
+            ["Opt-in", scopeValue("optIn", opt)],
+            ["Opt-out", scopeValue("optOut", optout)],
+            ["Neither", scopeValue("neither", neither)],
             ["Double Opt-in", "Not in workbook"],
           ]
             .map((x) => k(x[0], x[1]))
             .join("");
           if (scoped.length) {
-            lineMulti("consentTrend", [
-              { v: monthly((x) => x.optIn ?? 0), c: "#16a36a" },
-              { v: monthly((x) => x.optOut ?? 0), c: "#dc4c64" },
-              { v: monthly((x) => x.neither ?? 0), c: "#f5a623" },
-            ]);
-            bars("consentMix", [
+            const consentTrendSets = [
+              ...(hasMetricData("optIn")
+                ? [{ v: monthly((x) => x.optIn ?? 0), c: "#16a36a" }]
+                : []),
+              ...(hasMetricData("optOut")
+                ? [{ v: monthly((x) => x.optOut ?? 0), c: "#dc4c64" }]
+                : []),
+              ...(hasMetricData("neither")
+                ? [{ v: monthly((x) => x.neither ?? 0), c: "#f5a623" }]
+                : []),
+            ];
+            if (consentTrendSets.length) {
+              lineMulti("consentTrend", consentTrendSets);
+            } else {
+              unavailable("consentTrend", "No consent values for this filter.");
+            }
+            const consentMix = [
               ["Opt-in", opt],
               ["Opt-out", optout],
               ["Neither", neither],
-            ]);
-            lineMulti("marketTrend", [
-              { v: monthly((x) => x.market ?? 0), c: "#1267e8" },
-              ...(i4bRows.length
+            ].filter(([label]) =>
+              hasMetricData(
+                { "Opt-in": "optIn", "Opt-out": "optOut", Neither: "neither" }[
+                  label
+                ],
+              ),
+            );
+            if (consentMix.length) {
+              bars("consentMix", consentMix);
+            } else {
+              unavailable("consentMix", "No consent values for this filter.");
+            }
+            const marketTrendSets = [
+              ...(hasMetricData("market")
+                ? [{ v: monthly((x) => x.market ?? 0), c: "#1267e8" }]
+                : []),
+              ...(i4b !== null
                 ? [
                     {
-                      v: M.map((month) =>
-                        i4bRows
-                          .filter((row) => row.month === month)
-                          .reduce(
-                            (total, row) =>
-                              total +
-                              (marketableBreakdownValue(row, "i4b") ?? 0),
-                            0,
-                          ),
+                      v: M.map(
+                        (month) =>
+                          sumAvailable(
+                            i4bRows.filter((row) => row.month === month),
+                            (row) => marketableBreakdownValue(row, "i4b"),
+                          ) ?? 0,
                       ),
                       c: "#16a36a",
                     },
                   ]
                 : []),
-              {
-                v: M.map((month) =>
-                  withoutI4BRows
-                    .filter((row) => row.month === month)
-                    .reduce(
-                      (total, row) =>
-                        total +
-                        (marketableBreakdownValue(row, "withoutI4B") ?? 0),
-                      0,
-                    ),
-                ),
-                c: "#7c4dff",
-              },
-              {
-                v: M.map((month) =>
-                  nonEstoreRows
-                    .filter((row) => row.month === month)
-                    .reduce(
-                      (total, row) =>
-                        total +
-                        (marketableBreakdownValue(row, "nonEstore") ?? 0),
-                      0,
-                    ),
-                ),
-                c: "#f5a623",
-              },
-            ]);
+              ...(withoutI4B !== null
+                ? [
+                    {
+                      v: M.map(
+                        (month) =>
+                          sumAvailable(
+                            withoutI4BRows.filter((row) => row.month === month),
+                            (row) =>
+                              marketableBreakdownValue(row, "withoutI4B"),
+                          ) ?? 0,
+                      ),
+                      c: "#7c4dff",
+                    },
+                  ]
+                : []),
+              ...(nonEstore !== null
+                ? [
+                    {
+                      v: M.map(
+                        (month) =>
+                          sumAvailable(
+                            nonEstoreRows.filter((row) => row.month === month),
+                            (row) => marketableBreakdownValue(row, "nonEstore"),
+                          ) ?? 0,
+                      ),
+                      c: "#f5a623",
+                    },
+                  ]
+                : []),
+            ];
+            if (marketTrendSets.length) {
+              lineMulti("marketTrend", marketTrendSets);
+            } else {
+              unavailable(
+                "marketTrend",
+                "No marketable values for this filter.",
+              );
+            }
             bars("marketMix", [
-              ["Marketable Database", market],
-              ...(i4bRows.length ? [["I4B", i4b]] : []),
-              ["Without I4B", withoutI4B],
-              ["Non-eStore", nonEstore],
+              ...(scoped.some((row) => typeof row.market === "number")
+                ? [["Marketable Database", market]]
+                : []),
+              ...(i4b !== null ? [["I4B", i4b]] : []),
+              ...(withoutI4B !== null ? [["Without I4B", withoutI4B]] : []),
+              ...(nonEstore !== null ? [["Non-eStore", nonEstore]] : []),
             ]);
-            bars("consentRates", [
-              ["Opt-in Rate", db ? (opt / db) * 100 : 0],
-              ["Opt-out Rate", db ? (optout / db) * 100 : 0],
-              ["Neither Rate", db ? (neither / db) * 100 : 0],
-            ]);
-            bars("marketRates", [
-              ["Marketable Rate", db ? (market / db) * 100 : 0],
-            ]);
+            const consentRates = [
+              ["Opt-in Rate", "optIn", db ? (opt / db) * 100 : null],
+              ["Opt-out Rate", "optOut", db ? (optout / db) * 100 : null],
+              ["Neither Rate", "neither", db ? (neither / db) * 100 : null],
+            ]
+              .filter(
+                ([, metric, value]) =>
+                  hasMetricData(metric) &&
+                  hasMetricData("db") &&
+                  value !== null,
+              )
+              .map(([label, , value]) => [label, value]);
+            if (consentRates.length) {
+              bars("consentRates", consentRates);
+            } else {
+              unavailable("consentRates", "No consent rates for this filter.");
+            }
+            if (hasMetricData("db") && hasMetricData("market")) {
+              bars("marketRates", [
+                ["Marketable Rate", db ? (market / db) * 100 : 0],
+              ]);
+            } else {
+              unavailable("marketRates", "No marketable rate for this filter.");
+            }
           } else {
             [
               "consentTrend",
@@ -1512,15 +1622,15 @@
             ].forEach((id) => unavailable(id, "No data for this filter."));
           }
           $("marketKpis").innerHTML = [
-            ["Total Marketable", scopeValue(market)],
-            ["I4B", i4bRows.length ? fmt(i4b) : "Not available"],
+            ["Total Marketable", scopeValue("market", market)],
+            ["I4B", i4b === null ? "Not available" : fmt(i4b)],
             [
               "Without I4B",
-              withoutI4BRows.length ? fmt(withoutI4B) : "Not available",
+              withoutI4B === null ? "Not available" : fmt(withoutI4B),
             ],
             [
               "Non-eStore",
-              nonEstoreRows.length ? fmt(nonEstore) : "Not available",
+              nonEstore === null ? "Not available" : fmt(nonEstore),
             ],
           ]
             .map((x) => k(x[0], typeof x[1] === "number" ? fmt(x[1]) : x[1]))
@@ -1688,20 +1798,20 @@
               .forEach(([metric, label]) => {
                 const productValues = row[`${metric}Products`] || [];
                 explorerRows.push(
-                  `<tr><td>${label}</td><td>${escapeHtml(row.q)}</td><td>${escapeHtml(row.m)}</td><td>${escapeHtml(row.r)}</td><td>${fmt(row[metric])}</td>${PRODUCTS.map((_, index) => `<td>${fmt(productIndex === -1 || productIndex === index ? (productValues[index] ?? 0) : 0)}</td>`).join("")}</tr>`,
+                  `<tr><td>${label}</td><td>${escapeHtml(row.q)}</td><td>${escapeHtml(row.m)}</td><td>${escapeHtml(row.r)}</td><td>${fmt(row[metric])}</td>${PRODUCTS.map((_, index) => `<td>${productIndex !== -1 && productIndex !== index ? "--" : productValues[index] == null ? "Not available" : fmt(productValues[index])}</td>`).join("")}</tr>`,
                 );
               });
           });
           $("explorerRows").innerHTML = scoped.length
             ? explorerRows.slice(0, 100).join("")
-            : '<tr><td colspan="10">No data for this filter.</td></tr>';
-          window.__campaignRows = campaignRows.map(
-            (row) =>
-              `<tr><td>${escapeHtml(row.campaign)}</td><td>${escapeHtml(row.region)}</td><td>${escapeHtml(row.month)}</td><td>${escapeHtml(row.type)}</td><td>${fmt(row.sent)}</td><td>${fmt(row.delivered)}</td><td>${campaignRate(row).open.toFixed(1)}%</td><td>${campaignRate(row).ctr.toFixed(1)}%</td></tr>`,
-          );
+            : '<tr><td colspan="11">No data for this filter.</td></tr>';
+          window.__campaignRows = campaignRows.map((row) => {
+            const rate = campaignRate(row);
+            return `<tr><td>${escapeHtml(row.campaign)}</td><td>${escapeHtml(row.region)}</td><td>${escapeHtml(row.month)}</td><td>${escapeHtml(row.type)}</td><td>${displayAvailable(row.sent)}</td><td>${displayAvailable(row.delivered)}</td><td>${rate.open === null ? "Not available" : rate.open.toFixed(1) + "%"}</td><td>${rate.ctr === null ? "Not available" : rate.ctr.toFixed(1) + "%"}</td></tr>`;
+          });
           window.__formRows = formRows.map(
             (row) =>
-              `<tr><td>${escapeHtml(row.name)}</td><td>${escapeHtml(row.region)}</td><td>${escapeHtml(row.month)}</td><td>${fmt(row.submissions)}</td><td>${fmt(row.uniqueSubmissions)}</td><td>${fmt(row.newContacts)}</td></tr>`,
+              `<tr><td>${escapeHtml(row.name)}</td><td>${escapeHtml(row.region)}</td><td>${escapeHtml(row.month)}</td><td>${displayAvailable(row.submissions)}</td><td>${displayAvailable(row.uniqueSubmissions)}</td><td>${displayAvailable(row.newContacts)}</td></tr>`,
           );
           renderPaginatedTable("campaign");
           renderPaginatedTable("form");

@@ -1,12 +1,21 @@
 import argparse
 import json
 import math
+import warnings
 from pathlib import Path
 
 from openpyxl import load_workbook
 
 
-PRODUCTS = ["Mobile", "Display", "Climate", "Others", "Non Standard"]
+PRODUCTS = [
+    "Mobile",
+    "Display",
+    "Climate",
+    "Others",
+    "Non Standard",
+    "Blank",
+]
+REQUIRED_PRODUCTS = PRODUCTS[:-1]
 REGIONS = ["SEUK SMB", "SEBN", "SEG", "SESA", "SEF", "SEP", "SEH", "SEACE"]
 MONTHS = [
     "January",
@@ -103,6 +112,14 @@ def number(value, location, blank_as_zero=False):
     return int(result)
 
 
+def optional_number(value, location):
+    if value is None or value == "":
+        return None
+    if isinstance(value, str) and value.strip().upper() in {"NA", "N/A", "BLANK"}:
+        return None
+    return number(value, location)
+
+
 def rows_for_metric(workbook, sheet_name, metric_name):
     if sheet_name not in workbook.sheetnames:
         raise ValueError(f"Workbook is missing the required sheet {sheet_name!r}.")
@@ -116,25 +133,61 @@ def rows_for_metric(workbook, sheet_name, metric_name):
             f"Sheet {sheet_name!r} is missing the {metric_name!r} column."
         )
     product_indexes = []
-    for product in PRODUCTS:
+    for product in REQUIRED_PRODUCTS:
         if normalized(product) not in header_indexes:
             raise ValueError(
                 f"Sheet {sheet_name!r} is missing the {product!r} column."
             )
-        product_indexes.append(header_indexes[normalized(product)])
+    for product in PRODUCTS:
+        product_indexes.append(
+            headers.index(normalized(product))
+            if normalized(product) in headers
+            else None
+        )
+    quarter_header = "quarter" if "quarter" in header_indexes else "quater"
+    key_indexes = [
+        header_indexes.get(name)
+        for name in ("year", quarter_header, "month", "region")
+    ]
+    if any(index is None for index in key_indexes):
+        raise ValueError(
+            f"Sheet {sheet_name!r} is missing a year, quarter, month, or region column."
+        )
+    country_index = header_indexes.get("country")
 
     result = {}
+    summary_keys = set()
     for row_number, row in enumerate(iterator, start=2):
-        key_cells = tuple(row[index] if index < len(row) else None for index in range(4))
-        value = row[metric_index] if metric_index < len(row) else None
+        key_cells = tuple(
+            row[index] if index < len(row) else None for index in key_indexes
+        )
+        value = optional_number(
+            row[metric_index] if metric_index < len(row) else None,
+            f"{sheet_name!r} row {row_number}",
+        )
         product_values = [
-            row[index] if index < len(row) else None for index in product_indexes
+            optional_number(
+                row[index] if index < len(row) else None,
+                f"{sheet_name!r} row {row_number}",
+            )
+            if index is not None
+            else None
+            for index in product_indexes
         ]
-        if all(cell is None or cell == "" for cell in (value, *product_values)):
+        if value is None and all(cell is None for cell in product_values):
             continue
         if any(cell is None or cell == "" for cell in key_cells):
             raise ValueError(f"Sheet {sheet_name!r}, row {row_number}: missing key.")
         year, quarter, month, region = [str(cell).strip() for cell in key_cells]
+        country = (
+            str(row[country_index]).strip()
+            if country_index is not None
+            and country_index < len(row)
+            and row[country_index] is not None
+            else ""
+        )
+        if region not in REGIONS and country in REGIONS:
+            country, region = region, country
         if month not in MONTHS or region not in REGIONS:
             raise ValueError(
                 f"Sheet {sheet_name!r}, row {row_number}: unknown month or region."
@@ -144,17 +197,23 @@ def rows_for_metric(workbook, sheet_name, metric_name):
                 f"Sheet {sheet_name!r}, row {row_number}: unknown quarter {quarter!r}."
             )
         key = (year, quarter, month, region)
-        if key in result:
-            raise ValueError(
-                f"Sheet {sheet_name!r} contains a duplicate key on row {row_number}."
-            )
-        result[key] = {
-            "value": number(value, f"{sheet_name!r} row {row_number}"),
-            "products": [
-                number(cell, f"{sheet_name!r} row {row_number}", blank_as_zero=True)
-                for cell in product_values
-            ],
-        }
+        if key in summary_keys and country.lower() != "all":
+            continue
+        if country.lower() == "all":
+            result[key] = {"value": value, "products": product_values}
+            summary_keys.add(key)
+            continue
+        record = result.setdefault(
+            key,
+            {"value": None, "products": [None] * len(PRODUCTS)},
+        )
+        if value is not None:
+            record["value"] = (record["value"] or 0) + value
+        for index, product_value in enumerate(product_values):
+            if product_value is not None:
+                record["products"][index] = (
+                    (record["products"][index] or 0) + product_value
+                )
     return result
 
 
@@ -165,30 +224,74 @@ def rows_for_dimension(workbook, sheet_name, category_name, metric_name):
     iterator = worksheet.iter_rows(values_only=True)
     headers = [normalized(value) for value in next(iterator)]
     header_indexes = {name: index for index, name in enumerate(headers) if name}
+    quarter_header = "quarter" if "quarter" in header_indexes else "quater"
+    metric_header = normalized(metric_name)
+    if metric_header not in header_indexes and normalized(category_name) == "lead_source":
+        metric_header = normalized("Marketable-Lead_Source count")
     required = [
         "year",
-        "quater",
+        quarter_header,
         "month",
         "region",
         normalized(category_name),
-        normalized(metric_name),
-        *[normalized(product) for product in PRODUCTS],
+        metric_header,
     ]
     missing = [name for name in required if name not in header_indexes]
     if missing:
         raise ValueError(
             f"Sheet {sheet_name!r} is missing columns: {', '.join(missing)}."
         )
+    missing_products = [
+        normalized(product)
+        for product in REQUIRED_PRODUCTS
+        if normalized(product) not in header_indexes
+    ]
+    if missing_products:
+        raise ValueError(
+            f"Sheet {sheet_name!r} is missing product columns: "
+            f"{', '.join(missing_products)}."
+        )
 
+    indexes = [header_indexes[name] for name in required]
+    product_indexes = [
+        headers.index(normalized(product))
+        if normalized(product) in headers
+        else None
+        for product in PRODUCTS
+    ]
     result = []
+    summary_keys = set()
     for row_number, row in enumerate(iterator, start=2):
-        indexes = [header_indexes[name] for name in required]
         cells = [row[index] if index < len(row) else None for index in indexes]
-        if all(value is None or value == "" for value in cells[5:]):
+        year, quarter, month, region, category, value = cells
+        value = optional_number(value, f"{sheet_name!r} row {row_number}")
+        products = [
+            optional_number(row[index], f"{sheet_name!r} row {row_number}")
+            if index is not None and index < len(row)
+            else None
+            for index in product_indexes
+        ]
+        if value is None and all(product is None for product in products):
             continue
-        year, quarter, month, region, category, value, *products = cells
-        if any(value is None or value == "" for value in (year, quarter, month, region)):
+        key_values = (year, quarter, month, region)
+        if all(value is None or value == "" for value in key_values):
+            warnings.warn(
+                f"Skipped {sheet_name!r} row {row_number}: metric values have no date or region key.",
+                stacklevel=2,
+            )
+            continue
+        if any(value is None or value == "" for value in key_values):
             raise ValueError(f"Sheet {sheet_name!r}, row {row_number}: missing key.")
+        country_index = header_indexes.get("country")
+        country = (
+            str(row[country_index]).strip()
+            if country_index is not None
+            and country_index < len(row)
+            and row[country_index] is not None
+            else ""
+        )
+        if region not in REGIONS and country in REGIONS:
+            country, region = region, country
         year, quarter, month, region = [
             str(value).strip() for value in (year, quarter, month, region)
         ]
@@ -200,25 +303,26 @@ def rows_for_dimension(workbook, sheet_name, category_name, metric_name):
             raise ValueError(
                 f"Sheet {sheet_name!r}, row {row_number}: unknown quarter {quarter!r}."
             )
-        result.append(
-            {
+        record = {
                 "year": year,
                 "quarter": quarter,
                 "month": month,
                 "region": region,
                 "category": str(category or "Blank").strip() or "Blank",
-                "value": number(value, f"{sheet_name!r} row {row_number}"),
-                "products": [
-                    number(
-                        product,
-                        f"{sheet_name!r} row {row_number}",
-                        blank_as_zero=True,
-                    )
-                    for product in products
-                ],
+                "value": value,
+                "products": products,
             }
-        )
-    return result
+        summary_key = (year, quarter, month, region, record["category"])
+        if country.lower() == "all":
+            summary_keys.add(summary_key)
+            result.append((summary_key, country, record))
+        else:
+            result.append((summary_key, country, record))
+    return [
+        record
+        for key, country, record in result
+        if key not in summary_keys or country.lower() == "all"
+    ]
 
 
 def cell_value(row, indexes, key):
@@ -227,12 +331,54 @@ def cell_value(row, indexes, key):
 
 
 def nullable_number(value, location):
-    if value is None or value == "":
+    if value is None or value == "" or (
+        isinstance(value, str) and value.strip().upper() in {"NA", "N/A", "BLANK"}
+    ):
         return None
-    result = float(value)
+    try:
+        result = float(value.replace(",", "").strip() if isinstance(value, str) else value)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"{location}: expected a number, found {value!r}.") from error
     if not math.isfinite(result):
         raise ValueError(f"{location}: invalid number {value!r}.")
     return result
+
+
+def data_sheet_status(worksheet, metric_names):
+    rows = list(worksheet.iter_rows(values_only=True))
+    headers = [normalized(value) for value in rows[0]] if rows else []
+    indexes = {name: index for index, name in enumerate(headers) if name}
+    metric_index = next(
+        (indexes[normalized(name)] for name in metric_names if normalized(name) in indexes),
+        None,
+    )
+    product_indexes = [
+        headers.index(normalized(product))
+        for product in PRODUCTS
+        if normalized(product) in headers
+    ]
+    value_indexes = (
+        ([metric_index] if metric_index is not None else []) + product_indexes
+    )
+    values = [
+        row[metric_index]
+        for row in rows[1:]
+        if metric_index is not None
+        and metric_index < len(row)
+        and isinstance(row[metric_index], (int, float))
+    ]
+    if not values:
+        values = [
+            row[index]
+            for row in rows[1:]
+            for index in value_indexes
+            if index < len(row) and isinstance(row[index], (int, float))
+        ]
+    if not values:
+        return "blank"
+    if len(set(values)) <= max(12, math.floor(len(values) * 0.1)):
+        return "included-placeholder"
+    return "loaded"
 
 
 def read_detail_sheet(workbook, sheet_name, kind):
@@ -334,29 +480,27 @@ def audit_sheets(workbook):
         ]
         if worksheet.title in loaded_sheets:
             if worksheet.title in MARKETABLE_BREAKDOWN_SHEETS:
-                metric_name = normalized(
-                    MARKETABLE_BREAKDOWN_SHEETS[worksheet.title][1]
+                status = data_sheet_status(
+                    worksheet,
+                    [MARKETABLE_BREAKDOWN_SHEETS[worksheet.title][1]],
                 )
-                metric_index = headers.index(metric_name) if metric_name in headers else -1
-                product_indexes = [
-                    headers.index(normalized(product))
-                    for product in PRODUCTS
-                    if normalized(product) in headers
-                ]
-                has_values = any(
-                    (metric_index >= 0 and metric_index < len(row) and row[metric_index] not in (None, ""))
-                    or any(index < len(row) and row[index] not in (None, "") for index in product_indexes)
-                    for row in rows[1:]
+            elif worksheet.title in ESTORE_SHEETS:
+                status = data_sheet_status(
+                    worksheet,
+                    [ESTORE_SHEETS[worksheet.title][1]],
                 )
-                status = "included-placeholder" if has_values else "blank"
+            elif worksheet.title in ENGAGEMENT_SHEETS:
+                status = data_sheet_status(
+                    worksheet,
+                    [ENGAGEMENT_SHEETS[worksheet.title][1]],
+                )
+            elif worksheet.title in AUDIENCE_SHEETS:
+                status = data_sheet_status(
+                    worksheet,
+                    [AUDIENCE_SHEETS[worksheet.title][2], "Marketable-Lead_Source count"],
+                )
             else:
-                status = (
-                    "included-placeholder"
-                    if worksheet.title in ESTORE_SHEETS
-                    or worksheet.title in ENGAGEMENT_SHEETS
-                    or worksheet.title in AUDIENCE_SHEETS
-                    else "loaded"
-                )
+                status = "loaded"
         else:
             metric_index = 5 if len(headers) > 5 else 4
             values = [
@@ -412,28 +556,28 @@ def build_payload(input_path):
         )
 
     records = {}
-    for key, values in metric_rows["db"].items():
-        records[key] = {
-            "year": key[0],
-            "q": key[1],
-            "m": key[2],
-            "r": key[3],
-        }
-        records[key]["db"] = values["value"]
-        records[key]["dbProducts"] = values["products"]
     for metric, rows in metric_rows.items():
-        if metric == "db":
-            continue
         for key, values in rows.items():
-            if key not in records:
-                raise ValueError(
-                    f"Sheet data contains a record not found in Total Database: {key!r}."
-                )
+            record = records.setdefault(
+                key,
+                {
+                    "year": key[0],
+                    "q": key[1],
+                    "m": key[2],
+                    "r": key[3],
+                },
+            )
             records[key][metric] = values["value"]
             records[key][f"{metric}Products"] = values["products"]
 
     for record in records.values():
-        if sum(record["dbProducts"]) != record["db"]:
+        db_products = record.get("dbProducts", [])
+        if (
+            record.get("db") is not None
+            and db_products
+            and all(value is not None for value in db_products)
+            and sum(db_products) != record["db"]
+        ):
             raise ValueError(
                 f"Product totals do not match Total Database for "
                 f"{record['year']}, {record['m']}, {record['r']}."
@@ -493,7 +637,14 @@ def build_payload(input_path):
             for metric, rows in marketable_breakdown.items()
         },
         "audienceDimensions": audience_rows,
-        "missingDatabaseRows": max(0, expected_records - len(records)),
+        "missingDatabaseRows": max(
+            0,
+            expected_records
+            - sum(
+                values["value"] is not None
+                for values in metric_rows["db"].values()
+            ),
+        ),
         "campaigns": read_detail_sheet(workbook, CAMPAIGN_SHEET, "campaign"),
         "forms": read_detail_sheet(workbook, FORM_SHEET, "form"),
         "sheetAudit": audit_sheets(workbook),
