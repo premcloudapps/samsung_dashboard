@@ -21,4 +21,7 @@ the dashboard data-status note after each refresh.
 
 Serve the dashboard from a web server; opening `index.html` directly from disk
 does not allow the browser to fetch its adjacent JSON file. Keep the hosting
-location access-controlled when the workbook contains sensitive data.
+location access-controlled when the workbook contains sensitive data. The
+dashboard revalidates the JSON on each visit so monthly updates stay current
+without forcing browsers to discard their cached copy. For faster repeat loads,
+enable ETag or Last-Modified validation and gzip/Brotli compression on the host.

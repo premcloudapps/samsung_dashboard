@@ -1241,7 +1241,7 @@
           const status = $("dataStatus");
           try {
             const response = await fetch("./dashboard-data.json", {
-              cache: "no-store",
+              cache: "no-cache",
             });
             if (!response.ok) {
               throw new Error(
