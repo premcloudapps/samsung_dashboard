@@ -88,7 +88,7 @@ AUDIENCE_SHEETS = {
         "Lead_Source count",
     ),
 }
-CAMPAIGN_SHEET = "Campaign Peformance"
+CAMPAIGN_SHEET = "Campaign Performance"
 FORM_SHEET = "Form submission"
 
 
@@ -389,6 +389,11 @@ def read_detail_sheet(workbook, sheet_name, kind):
     headers = [normalized(value) for value in next(iterator)]
     indexes = {name: index for index, name in enumerate(headers) if name}
     quarter_header = "quarter" if "quarter" in indexes else "quater"
+    campaign_name_header = (
+        "campaign name"
+        if "campaign name" in indexes
+        else "campaign / program name"
+    )
     required = (
         {
             "year",
@@ -396,7 +401,7 @@ def read_detail_sheet(workbook, sheet_name, kind):
             "month",
             "region",
             "type",
-            "campaign name",
+            campaign_name_header,
             "total_sent",
             "total_delivered",
             "unique_html_opens",
@@ -436,7 +441,7 @@ def read_detail_sheet(workbook, sheet_name, kind):
                     "month": str(get("month") or "").strip(),
                     "region": str(get("region") or "").strip(),
                     "type": str(get("type") or "").strip(),
-                    "campaign": str(get("campaign name") or "").strip(),
+                    "campaign": str(get(campaign_name_header) or "").strip(),
                     "sent": nullable_number(get("total_sent"), f"{sheet_name} row {row_number}"),
                     "delivered": nullable_number(get("total_delivered"), f"{sheet_name} row {row_number}"),
                     "uniqueOpens": nullable_number(get("unique_html_opens"), f"{sheet_name} row {row_number}"),
