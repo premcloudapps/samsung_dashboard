@@ -1821,6 +1821,12 @@
                 typeof row.submissions === "number" &&
                 Number.isFinite(row.submissions),
             )
+            .sort(
+              (a, b) =>
+                Number(String(b.year).replace(/\D/g, "")) -
+                  Number(String(a.year).replace(/\D/g, "")) ||
+                M.indexOf(b.month) - M.indexOf(a.month),
+            )
             .map(
               (row) =>
                 `<tr><td>${escapeHtml(row.name)}</td><td>${escapeHtml(row.region)}</td><td>${escapeHtml(row.month)}</td><td>${displayAvailable(row.submissions)}</td><td>${displayAvailable(row.uniqueSubmissions)}</td><td>${displayAvailable(row.newContacts)}</td></tr>`,
