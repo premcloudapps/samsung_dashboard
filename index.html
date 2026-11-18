@@ -1226,7 +1226,11 @@
             const value =
               productIndex === -1 ? row.value : row.products?.[productIndex];
             if (typeof value !== "number") return;
-            totals.set(row.category, (totals.get(row.category) || 0) + value);
+            const category =
+              dimension === "employees" && row.category === "50-99"
+                ? "50~99"
+                : row.category;
+            totals.set(category, (totals.get(category) || 0) + value);
           });
           if (!totals.size) {
             unavailable(elementId, "No audience values for this filter.");
