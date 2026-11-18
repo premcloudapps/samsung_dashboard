@@ -1011,6 +1011,13 @@
           "Non Standard",
           "Blank",
         ];
+        const EMPLOYEE_CATEGORY_ALIASES = new Map([
+          ["50-99", "50~99"],
+          ["50-199", "50~199"],
+          ["200-499", "200~499"],
+          ["(blank)", "Blank"],
+          ["", "Blank"],
+        ]);
         const M = [
             "January",
             "February",
@@ -1227,11 +1234,11 @@
               productIndex === -1 ? row.value : row.products?.[productIndex];
             if (typeof value !== "number") return;
             const category =
-              dimension === "employees" && row.category === "50-199"
-                ? "50~199"
-                : dimension === "employees" && row.category === "50-99"
-                  ? "50~99"
-                  : row.category;
+              dimension === "employees"
+                ? (EMPLOYEE_CATEGORY_ALIASES.get(
+                    String(row.category).trim().toLowerCase(),
+                  ) ?? row.category)
+                : row.category;
             totals.set(category, (totals.get(category) || 0) + value);
           });
           if (!totals.size) {
