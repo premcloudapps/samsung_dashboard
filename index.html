@@ -1818,7 +1818,11 @@
           $("explorerRows").innerHTML = scoped.length
             ? explorerRows.slice(0, 100).join("")
             : '<tr><td colspan="11">No data for this filter.</td></tr>';
-          window.__campaignRows = [...campaignRows]
+          window.__campaignRows = campaignRows
+            .filter(
+              (row) =>
+                typeof row.sent === "number" && Number.isFinite(row.sent),
+            )
             .sort(
               (a, b) =>
                 Number(String(b.year).replace(/\D/g, "")) -
