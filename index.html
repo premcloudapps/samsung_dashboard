@@ -210,6 +210,14 @@
         height: 100%;
         min-width: 560px;
       }
+      .chart-point {
+        cursor: pointer;
+      }
+      .chart-point:hover,
+      .chart-point:focus {
+        stroke: #071b33;
+        stroke-width: 1.5;
+      }
       .table-wrap {
         overflow: auto;
         border: 1px solid var(--l);
@@ -1022,7 +1030,7 @@
             "December",
           ],
           $ = (x) => document.getElementById(x),
-          fmt = (x) => Math.round(x).toLocaleString();
+          fmt = (x) => Math.round(x).toLocaleString("en-GB");
         M.forEach((x) => $("m").add(new Option(x, x)));
         let data = [],
           estoreData = [],
@@ -1126,35 +1134,18 @@
             .join("");
         }
         function line() {
-          let a = M.map((m) =>
-              scope()
-                .filter((x) => x.m === m)
-                .reduce((t, x) => t + x.db, 0),
-            ),
-            b = M.map((m) =>
-              scope()
-                .filter((x) => x.m === m)
-                .reduce((t, x) => t + x.market, 0),
-            ),
-            W = 700,
-            H = 210,
-            p = 25,
-            mx = Math.max(...a, 1) * 1.08,
-            X = (i) => p + (i * (W - 2 * p)) / 11,
-            Y = (v) => H - p - (v / mx) * (H - 2 * p),
-            s = `<svg viewBox="0 0 ${W} ${H}">`;
-          M.forEach(
-            (m, i) =>
-              (s += `<text x="${X(i)}" y="205" text-anchor="middle" font-size="8" fill="#718098">${m.slice(0, 3)}</text>`),
-          );
-          [
-            [a, "#1267e8"],
-            [b, "#16a36a"],
-          ].forEach(
-            (z) =>
-              (s += `<polyline fill="none" stroke="${z[1]}" stroke-width="3" points="${z[0].map((v, i) => X(i) + "," + Y(v)).join(" ")}"/>`),
-          );
-          $("trend").innerHTML = s + "</svg>";
+          lineMulti("trend", [
+            {
+              label: "Total Database",
+              v: monthly((row) => row.db ?? 0),
+              c: "#1267e8",
+            },
+            {
+              label: "Marketable Database",
+              v: monthly((row) => row.market ?? 0),
+              c: "#16a36a",
+            },
+          ]);
         }
         function lineMulti(id, sets) {
           let W = 700,
@@ -1163,7 +1154,7 @@
             mx = Math.max(1, ...sets.flatMap((z) => z.v)) * 1.08,
             X = (i) => p + (i * (W - 2 * p)) / 11,
             Y = (v) => H - p - (v / mx) * (H - 2 * p),
-            z = `<svg viewBox="0 0 ${W} ${H}">`;
+            z = `<svg viewBox="0 0 ${W} 245" role="img" aria-label="Monthly trend: ${sets.map((set) => escapeHtml(set.label)).join(", ")}">`;
           M.forEach(
             (m, i) =>
               (z += `<text x="${X(i)}" y="205" text-anchor="middle" font-size="8" fill="#718098">${m.slice(0, 3)}</text>`),
@@ -1172,6 +1163,18 @@
             (a) =>
               (z += `<polyline fill="none" stroke="${a.c}" stroke-width="3" points="${a.v.map((v, i) => X(i) + "," + Y(v)).join(" ")}"/>`),
           );
+          sets.forEach((set, index) => {
+            const center = ((index + 0.5) * W) / sets.length;
+            set.v.forEach((value, monthIndex) => {
+              const valueLabel =
+                  set.format === "percent"
+                    ? `${value.toFixed(1)}%`
+                    : fmt(value),
+                tooltip = `${M[monthIndex]}: ${set.label} ${valueLabel}`;
+              z += `<circle class="chart-point" cx="${X(monthIndex)}" cy="${Y(value)}" r="3" fill="${set.c}" tabindex="0" aria-label="${escapeHtml(tooltip)}"><title>${escapeHtml(tooltip)}</title></circle>`;
+            });
+            z += `<g aria-hidden="true"><line x1="${center - 58}" y1="230" x2="${center - 42}" y2="230" stroke="${set.c}" stroke-width="3"/><text x="${center - 36}" y="233" font-size="10" fill="#536178">${escapeHtml(set.label)}</text></g>`;
+          });
           if ($(id)) $(id).innerHTML = z + "</svg>";
         }
         function monthly(fn) {
@@ -1510,13 +1513,31 @@
           if (scoped.length) {
             const consentTrendSets = [
               ...(hasMetricData("optIn")
-                ? [{ v: monthly((x) => x.optIn ?? 0), c: "#16a36a" }]
+                ? [
+                    {
+                      label: "Opt-in",
+                      v: monthly((x) => x.optIn ?? 0),
+                      c: "#16a36a",
+                    },
+                  ]
                 : []),
               ...(hasMetricData("optOut")
-                ? [{ v: monthly((x) => x.optOut ?? 0), c: "#dc4c64" }]
+                ? [
+                    {
+                      label: "Opt-out",
+                      v: monthly((x) => x.optOut ?? 0),
+                      c: "#dc4c64",
+                    },
+                  ]
                 : []),
               ...(hasMetricData("neither")
-                ? [{ v: monthly((x) => x.neither ?? 0), c: "#f5a623" }]
+                ? [
+                    {
+                      label: "Neither",
+                      v: monthly((x) => x.neither ?? 0),
+                      c: "#f5a623",
+                    },
+                  ]
                 : []),
             ];
             if (consentTrendSets.length) {
@@ -1542,11 +1563,18 @@
             }
             const marketTrendSets = [
               ...(hasMetricData("market")
-                ? [{ v: monthly((x) => x.market ?? 0), c: "#1267e8" }]
+                ? [
+                    {
+                      label: "Marketable Database",
+                      v: monthly((x) => x.market ?? 0),
+                      c: "#1267e8",
+                    },
+                  ]
                 : []),
               ...(i4b !== null
                 ? [
                     {
+                      label: "I4B",
                       v: M.map(
                         (month) =>
                           sumAvailable(
@@ -1561,6 +1589,7 @@
               ...(withoutI4B !== null
                 ? [
                     {
+                      label: "Without I4B",
                       v: M.map(
                         (month) =>
                           sumAvailable(
@@ -1576,6 +1605,7 @@
               ...(nonEstore !== null
                 ? [
                     {
+                      label: "Non-eStore",
                       v: M.map(
                         (month) =>
                           sumAvailable(
@@ -1703,9 +1733,17 @@
             );
           if (scopedEstore.length) {
             lineMulti("estoreTrend", [
-              { v: estoreMonthly("registered"), c: "#1267e8" },
-              { v: estoreMonthly("sale"), c: "#16a36a" },
-              { v: estoreMonthly("abandoned"), c: "#dc4c64" },
+              {
+                label: "Registered",
+                v: estoreMonthly("registered"),
+                c: "#1267e8",
+              },
+              { label: "Sale", v: estoreMonthly("sale"), c: "#16a36a" },
+              {
+                label: "Abandoned",
+                v: estoreMonthly("abandoned"),
+                c: "#dc4c64",
+              },
             ]);
             bars(
               "estoreMix",
@@ -1763,8 +1801,18 @@
                 : 0;
             });
           lineMulti("campaignGraph", [
-            { v: campaignOpen, c: "#1267e8" },
-            { v: campaignCtrByMonth, c: "#f5a623" },
+            {
+              label: "Open Rate",
+              v: campaignOpen,
+              c: "#1267e8",
+              format: "percent",
+            },
+            {
+              label: "CTR",
+              v: campaignCtrByMonth,
+              c: "#f5a623",
+              format: "percent",
+            },
           ]);
           bars(
             "campaignMix",
@@ -1787,6 +1835,7 @@
             );
           lineMulti("formGraph", [
             {
+              label: "Submissions",
               v: formByMonth.map((rows) => sumRecords(rows, "submissions")),
               c: "#16a36a",
             },
