@@ -701,7 +701,13 @@
       </div>
     </header>
     <main class="wrap">
-      <div class="note" id="dataStatus" role="status" aria-live="polite" style="display: none;">
+      <div
+        class="note"
+        id="dataStatus"
+        role="status"
+        aria-live="polite"
+        style="display: none"
+      >
         Loading dashboard data...
       </div>
       <div class="filters">
@@ -1809,10 +1815,16 @@
             const rate = campaignRate(row);
             return `<tr><td>${escapeHtml(row.campaign)}</td><td>${escapeHtml(row.region)}</td><td>${escapeHtml(row.month)}</td><td>${escapeHtml(row.type)}</td><td>${displayAvailable(row.sent)}</td><td>${displayAvailable(row.delivered)}</td><td>${rate.open === null ? "Not available" : rate.open.toFixed(1) + "%"}</td><td>${rate.ctr === null ? "Not available" : rate.ctr.toFixed(1) + "%"}</td></tr>`;
           });
-          window.__formRows = formRows.map(
-            (row) =>
-              `<tr><td>${escapeHtml(row.name)}</td><td>${escapeHtml(row.region)}</td><td>${escapeHtml(row.month)}</td><td>${displayAvailable(row.submissions)}</td><td>${displayAvailable(row.uniqueSubmissions)}</td><td>${displayAvailable(row.newContacts)}</td></tr>`,
-          );
+          window.__formRows = formRows
+            .filter(
+              (row) =>
+                typeof row.submissions === "number" &&
+                Number.isFinite(row.submissions),
+            )
+            .map(
+              (row) =>
+                `<tr><td>${escapeHtml(row.name)}</td><td>${escapeHtml(row.region)}</td><td>${escapeHtml(row.month)}</td><td>${displayAvailable(row.submissions)}</td><td>${displayAvailable(row.uniqueSubmissions)}</td><td>${displayAvailable(row.newContacts)}</td></tr>`,
+            );
           renderPaginatedTable("campaign");
           renderPaginatedTable("form");
         }
