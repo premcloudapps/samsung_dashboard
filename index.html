@@ -773,7 +773,6 @@
             <div class="sub">Metrics from populated workbook sheets</div>
             <div id="totals" class="kgrid"></div>
             <div class="title" style="margin-top: 16px">Consent Breakdown</div>
-            <div class="sub">Double Opt-in is not provided in the workbook</div>
             <div id="execMarketBreakdown"></div>
           </div>
           <div class="card">
@@ -809,16 +808,6 @@
         </div>
       </section>
       <section class="section" id="consent">
-        <div
-          class="card"
-          style="margin-top: 14px; border-left: 4px solid #00a6a6"
-        >
-          <div class="title">Double Opt-in Availability</div>
-          <div class="sub">
-            The workbook does not provide a populated Double Opt-in sheet. No
-            estimate is shown.
-          </div>
-        </div>
         <div id="consentKpis" class="kgrid" style="margin-top: 14px"></div>
         <div class="grid charts">
           <div class="card">
@@ -1527,7 +1516,6 @@
             ["Opt-in", scopeValue("optIn", opt)],
             ["Opt-out", scopeValue("optOut", optout)],
             ["Neither", scopeValue("neither", neither)],
-            ["Double Opt-in", "Not in workbook"],
           ]
             .map((x) => k(x[0], x[1]))
             .join("");
