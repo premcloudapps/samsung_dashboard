@@ -1793,28 +1793,42 @@
           }
           const productIndex = PRODUCTS.indexOf($("p").value);
           let explorerRows = [];
-          scoped.forEach((row) => {
-            metricLabels
-              .filter(
-                ([metric]) =>
-                  availableMetrics.has(metric) &&
-                  row[metric] !== null &&
-                  row[metric] !== undefined,
-              )
-              .forEach(([metric, label]) => {
-                const productValues = row[`${metric}Products`] || [];
-                explorerRows.push(
-                  `<tr><td>${label}</td><td>${escapeHtml(row.q)}</td><td>${escapeHtml(row.m)}</td><td>${escapeHtml(row.r)}</td><td>${fmt(row[metric])}</td>${PRODUCTS.map((_, index) => `<td>${productIndex !== -1 && productIndex !== index ? "--" : productValues[index] == null ? "Not available" : fmt(productValues[index])}</td>`).join("")}</tr>`,
-                );
-              });
-          });
+          [...scoped]
+            .sort(
+              (a, b) =>
+                Number(String(b.year).replace(/\D/g, "")) -
+                  Number(String(a.year).replace(/\D/g, "")) ||
+                M.indexOf(b.m) - M.indexOf(a.m),
+            )
+            .forEach((row) => {
+              metricLabels
+                .filter(
+                  ([metric]) =>
+                    availableMetrics.has(metric) &&
+                    row[metric] !== null &&
+                    row[metric] !== undefined,
+                )
+                .forEach(([metric, label]) => {
+                  const productValues = row[`${metric}Products`] || [];
+                  explorerRows.push(
+                    `<tr><td>${label}</td><td>${escapeHtml(row.q)}</td><td>${escapeHtml(row.m)}</td><td>${escapeHtml(row.r)}</td><td>${fmt(row[metric])}</td>${PRODUCTS.map((_, index) => `<td>${productIndex !== -1 && productIndex !== index ? "--" : productValues[index] == null ? "Not available" : fmt(productValues[index])}</td>`).join("")}</tr>`,
+                  );
+                });
+            });
           $("explorerRows").innerHTML = scoped.length
             ? explorerRows.slice(0, 100).join("")
             : '<tr><td colspan="11">No data for this filter.</td></tr>';
-          window.__campaignRows = campaignRows.map((row) => {
-            const rate = campaignRate(row);
-            return `<tr><td>${escapeHtml(row.campaign)}</td><td>${escapeHtml(row.region)}</td><td>${escapeHtml(row.month)}</td><td>${escapeHtml(row.type)}</td><td>${displayAvailable(row.sent)}</td><td>${displayAvailable(row.delivered)}</td><td>${rate.open === null ? "Not available" : rate.open.toFixed(1) + "%"}</td><td>${rate.ctr === null ? "Not available" : rate.ctr.toFixed(1) + "%"}</td></tr>`;
-          });
+          window.__campaignRows = [...campaignRows]
+            .sort(
+              (a, b) =>
+                Number(String(b.year).replace(/\D/g, "")) -
+                  Number(String(a.year).replace(/\D/g, "")) ||
+                M.indexOf(b.month) - M.indexOf(a.month),
+            )
+            .map((row) => {
+              const rate = campaignRate(row);
+              return `<tr><td>${escapeHtml(row.campaign)}</td><td>${escapeHtml(row.region)}</td><td>${escapeHtml(row.month)}</td><td>${escapeHtml(row.type)}</td><td>${displayAvailable(row.sent)}</td><td>${displayAvailable(row.delivered)}</td><td>${rate.open === null ? "Not available" : rate.open.toFixed(1) + "%"}</td><td>${rate.ctr === null ? "Not available" : rate.ctr.toFixed(1) + "%"}</td></tr>`;
+            });
           window.__formRows = formRows
             .filter(
               (row) =>
