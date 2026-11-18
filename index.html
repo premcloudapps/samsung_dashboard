@@ -1015,9 +1015,21 @@
           ["50-99", "50~99"],
           ["50-199", "50~199"],
           ["200-499", "200~499"],
+          ["500-999", "500~999"],
           ["(blank)", "Blank"],
           ["", "Blank"],
         ]);
+        const EMPLOYEE_CATEGORY_ORDER = [
+          "Blank",
+          "<50",
+          "50~99",
+          "50~199",
+          "100-199",
+          "200~499",
+          "500~999",
+          ">1000",
+          "Unstandardised",
+        ];
         const M = [
             "January",
             "February",
@@ -1245,10 +1257,20 @@
             unavailable(elementId, "No audience values for this filter.");
             return;
           }
-          bars(
-            elementId,
-            [...totals.entries()].sort((a, b) => b[1] - a[1]),
-          );
+          const entries = [...totals.entries()];
+          if (dimension === "employees") {
+            entries.sort((a, b) => {
+              const aIndex = EMPLOYEE_CATEGORY_ORDER.indexOf(a[0]),
+                bIndex = EMPLOYEE_CATEGORY_ORDER.indexOf(b[0]);
+              if (aIndex === -1 && bIndex === -1) return b[1] - a[1];
+              if (aIndex === -1) return 1;
+              if (bIndex === -1) return -1;
+              return aIndex - bIndex;
+            });
+          } else {
+            entries.sort((a, b) => b[1] - a[1]);
+          }
+          bars(elementId, entries);
         }
         async function loadDashboardData() {
           const status = $("dataStatus");
