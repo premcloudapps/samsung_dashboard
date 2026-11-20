@@ -41,6 +41,8 @@ METRIC_SHEETS = {
         "Total - Niether Opt-in/Out Contacts",
     ),
     "New Contacts": ("newContacts", "New Contacts"),
+    "New Subscribers": ("newSubscribers", "New Subscribers"),
+    "New UnSubscribers": ("newUnsubscribers", "New UnSubscribers"),
     "Marketable Database": ("market", "Marketable Database"),
 }
 ESTORE_SHEETS = {
@@ -56,6 +58,7 @@ ESTORE_SHEETS = {
 }
 ENGAGEMENT_SHEETS = {
     "Engaged Contacts": ("engaged", "Engaged Contacts"),
+    "Touched Contacts": ("touched", "Touched Contacts last 3 month"),
 }
 MARKETABLE_BREAKDOWN_SHEETS = {
     "Marketable - I4B": (
@@ -85,7 +88,7 @@ AUDIENCE_SHEETS = {
     "Marketable - Lead Source": (
         "sources",
         "Lead_Source",
-        "Lead_Source count",
+        "Marketable",
     ),
 }
 CAMPAIGN_SHEET = "Campaign Performance"
@@ -156,6 +159,7 @@ def rows_for_metric(workbook, sheet_name, metric_name):
     country_index = header_indexes.get("country")
 
     result = {}
+    country_result = {}
     summary_keys = set()
     for row_number, row in enumerate(iterator, start=2):
         key_cells = tuple(
@@ -197,6 +201,19 @@ def rows_for_metric(workbook, sheet_name, metric_name):
                 f"Sheet {sheet_name!r}, row {row_number}: unknown quarter {quarter!r}."
             )
         key = (year, quarter, month, region)
+        if country and country.lower() != "all":
+            country_key = (*key, country)
+            country_record = country_result.setdefault(
+                country_key,
+                {"value": None, "products": [None] * len(PRODUCTS)},
+            )
+            if value is not None:
+                country_record["value"] = (country_record["value"] or 0) + value
+            for index, product_value in enumerate(product_values):
+                if product_value is not None:
+                    country_record["products"][index] = (
+                        (country_record["products"][index] or 0) + product_value
+                    )
         if key in summary_keys and country.lower() != "all":
             continue
         if country.lower() == "all":
@@ -214,7 +231,7 @@ def rows_for_metric(workbook, sheet_name, metric_name):
                 record["products"][index] = (
                     (record["products"][index] or 0) + product_value
                 )
-    return result
+    return result, country_result
 
 
 def rows_for_dimension(workbook, sheet_name, category_name, metric_name):
@@ -226,8 +243,19 @@ def rows_for_dimension(workbook, sheet_name, category_name, metric_name):
     header_indexes = {name: index for index, name in enumerate(headers) if name}
     quarter_header = "quarter" if "quarter" in header_indexes else "quater"
     metric_header = normalized(metric_name)
-    if metric_header not in header_indexes and normalized(category_name) == "lead_source":
-        metric_header = normalized("Marketable-Lead_Source count")
+    if normalized(category_name) == "lead_source":
+        metric_header = next(
+            (
+                header
+                for header in (
+                    metric_header,
+                    normalized("Marketable-Lead_Source count"),
+                    normalized("Lead_Source count"),
+                )
+                if header in header_indexes
+            ),
+            metric_header,
+        )
     required = [
         "year",
         quarter_header,
@@ -260,7 +288,6 @@ def rows_for_dimension(workbook, sheet_name, category_name, metric_name):
         for product in PRODUCTS
     ]
     result = []
-    summary_keys = set()
     for row_number, row in enumerate(iterator, start=2):
         cells = [row[index] if index < len(row) else None for index in indexes]
         year, quarter, month, region, category, value = cells
@@ -313,16 +340,43 @@ def rows_for_dimension(workbook, sheet_name, category_name, metric_name):
                 "products": products,
             }
         summary_key = (year, quarter, month, region, record["category"])
+        result.append((summary_key, country, record))
+    region_totals = {}
+    summary_rows = {}
+    country_rows = []
+    for key, country, record in result:
         if country.lower() == "all":
-            summary_keys.add(summary_key)
-            result.append((summary_key, country, record))
-        else:
-            result.append((summary_key, country, record))
-    return [
-        record
-        for key, country, record in result
-        if key not in summary_keys or country.lower() == "all"
-    ]
+            summary_rows[key] = record
+            continue
+        region_total = region_totals.setdefault(
+            key,
+            {
+                **record,
+                "value": None,
+                "products": [None] * len(PRODUCTS),
+            },
+        )
+        if record["value"] is not None:
+            region_total["value"] = (region_total["value"] or 0) + record["value"]
+        for index, value in enumerate(record["products"]):
+            if value is not None:
+                region_total["products"][index] = (
+                    (region_total["products"][index] or 0) + value
+                )
+        if country:
+            country_rows.append({**record, "country": country})
+
+    aggregate_rows = []
+    for key in dict.fromkeys((*region_totals, *summary_rows)):
+        aggregate = summary_rows.get(key, region_totals.get(key))
+        aggregate_rows.append(
+            {
+                **aggregate,
+                "products": list(aggregate["products"]),
+                "country": None,
+            }
+        )
+    return aggregate_rows + country_rows
 
 
 def cell_value(row, indexes, key):
@@ -440,6 +494,7 @@ def read_detail_sheet(workbook, sheet_name, kind):
                     "quarter": str(get(quarter_header) or "").strip(),
                     "month": str(get("month") or "").strip(),
                     "region": str(get("region") or "").strip(),
+                    "country": str(get("country") or "").strip() or None,
                     "type": str(get("type") or "").strip(),
                     "campaign": str(get(campaign_name_header) or "").strip(),
                     "sent": nullable_number(get("total_sent"), f"{sheet_name} row {row_number}"),
@@ -456,6 +511,7 @@ def read_detail_sheet(workbook, sheet_name, kind):
                     "quarter": str(get(quarter_header) or "").strip(),
                     "month": str(get("month") or "").strip(),
                     "region": str(get("region") or "").strip(),
+                    "country": str(get("country") or "").strip() or None,
                     "name": str(get("form name") or "").strip(),
                     "type": str(get("type") or "").strip(),
                     "submissions": nullable_number(get("total submission"), f"{sheet_name} row {row_number}"),
@@ -502,7 +558,11 @@ def audit_sheets(workbook):
             elif worksheet.title in AUDIENCE_SHEETS:
                 status = data_sheet_status(
                     worksheet,
-                    [AUDIENCE_SHEETS[worksheet.title][2], "Marketable-Lead_Source count"],
+                    [
+                        AUDIENCE_SHEETS[worksheet.title][2],
+                        "Marketable-Lead_Source count",
+                        "Lead_Source count",
+                    ],
                 )
             else:
                 status = "loaded"
@@ -529,24 +589,54 @@ def audit_sheets(workbook):
     return audit
 
 
+def metric_records(rows):
+    return [
+        {
+            "year": key[0],
+            "quarter": key[1],
+            "month": key[2],
+            "region": key[3],
+            "country": key[4] if len(key) > 4 else None,
+            "value": values["value"],
+            "products": values["products"],
+        }
+        for key, values in rows.items()
+    ]
+
+
 def build_payload(input_path):
     workbook = load_workbook(input_path, read_only=True, data_only=True)
     metric_rows = {}
+    country_metric_rows = {}
     for sheet_name, (metric, column_name) in METRIC_SHEETS.items():
-        metric_rows[metric] = rows_for_metric(workbook, sheet_name, column_name)
+        metric_rows[metric], country_metric_rows[metric] = rows_for_metric(
+            workbook,
+            sheet_name,
+            column_name,
+        )
     estore_rows = {}
+    country_estore_rows = {}
     for sheet_name, (metric, column_name) in ESTORE_SHEETS.items():
-        estore_rows[metric] = rows_for_metric(workbook, sheet_name, column_name)
+        estore_rows[metric], country_estore_rows[metric] = rows_for_metric(
+            workbook,
+            sheet_name,
+            column_name,
+        )
     engagement_rows = {}
+    country_engagement_rows = {}
     for sheet_name, (metric, column_name) in ENGAGEMENT_SHEETS.items():
-        engagement_rows[metric] = rows_for_metric(
+        engagement_rows[metric], country_engagement_rows[metric] = rows_for_metric(
             workbook,
             sheet_name,
             column_name,
         )
     marketable_breakdown = {}
+    country_marketable_breakdown = {}
     for sheet_name, (metric, column_name) in MARKETABLE_BREAKDOWN_SHEETS.items():
-        marketable_breakdown[metric] = rows_for_metric(
+        (
+            marketable_breakdown[metric],
+            country_marketable_breakdown[metric],
+        ) = rows_for_metric(
             workbook,
             sheet_name,
             column_name,
@@ -570,10 +660,27 @@ def build_payload(input_path):
                     "q": key[1],
                     "m": key[2],
                     "r": key[3],
+                    "country": None,
                 },
             )
             records[key][metric] = values["value"]
             records[key][f"{metric}Products"] = values["products"]
+
+    country_records = {}
+    for metric, rows in country_metric_rows.items():
+        for key, values in rows.items():
+            record = country_records.setdefault(
+                key,
+                {
+                    "year": key[0],
+                    "q": key[1],
+                    "m": key[2],
+                    "r": key[3],
+                    "country": key[4],
+                },
+            )
+            record[metric] = values["value"]
+            record[f"{metric}Products"] = values["products"]
 
     for record in records.values():
         db_products = record.get("dbProducts", [])
@@ -599,6 +706,23 @@ def build_payload(input_path):
                     "quarter": key[1],
                     "month": key[2],
                     "region": key[3],
+                    "country": None,
+                },
+            )
+            record[metric] = values["value"]
+            record[f"{metric}Products"] = values["products"]
+
+    country_estore_records = {}
+    for metric, rows in country_estore_rows.items():
+        for key, values in rows.items():
+            record = country_estore_records.setdefault(
+                key,
+                {
+                    "year": key[0],
+                    "quarter": key[1],
+                    "month": key[2],
+                    "region": key[3],
+                    "country": key[4],
                 },
             )
             record[metric] = values["value"]
@@ -608,37 +732,20 @@ def build_payload(input_path):
     return {
         "sourceWorkbook": input_path.name,
         "metrics": metrics,
-        "records": list(records.values()),
+        "records": list(records.values()) + list(country_records.values()),
         "estoreMetrics": sorted(estore_rows.keys()),
-        "estore": list(estore_records.values()),
+        "estore": list(estore_records.values())
+        + list(country_estore_records.values()),
         "engagementMetrics": sorted(engagement_rows.keys()),
         "engagement": {
-            metric: [
-                {
-                    "year": key[0],
-                    "quarter": key[1],
-                    "month": key[2],
-                    "region": key[3],
-                    "value": values["value"],
-                    "products": values["products"],
-                }
-                for key, values in rows.items()
-            ]
+            metric: metric_records(rows)
+            + metric_records(country_engagement_rows[metric])
             for metric, rows in engagement_rows.items()
         },
         "marketableBreakdownMetrics": sorted(marketable_breakdown.keys()),
         "marketableBreakdown": {
-            metric: [
-                {
-                    "year": key[0],
-                    "quarter": key[1],
-                    "month": key[2],
-                    "region": key[3],
-                    "value": values["value"],
-                    "products": values["products"],
-                }
-                for key, values in rows.items()
-            ]
+            metric: metric_records(rows)
+            + metric_records(country_marketable_breakdown[metric])
             for metric, rows in marketable_breakdown.items()
         },
         "audienceDimensions": audience_rows,

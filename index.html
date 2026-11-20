@@ -63,7 +63,7 @@
       }
       .filters {
         display: grid;
-        grid-template-columns: repeat(5, 1fr) auto;
+        grid-template-columns: repeat(6, 1fr) auto;
         gap: 10px;
         background: #fff;
         padding: 14px;
@@ -748,6 +748,12 @@
           </select>
         </div>
         <div class="f">
+          <label>Country</label
+          ><select id="country">
+            <option>All Countries</option>
+          </select>
+        </div>
+        <div class="f">
           <label>Product</label
           ><select id="p">
             <option>All Products</option>
@@ -799,7 +805,7 @@
           <div class="card">
             <div class="title">Engagement Flow</div>
             <div class="sub">
-              Engaged Contacts from the workbook; NA values are ignored.
+              Engagement values from the workbook; NA values are ignored.
             </div>
             <div id="engage"></div>
           </div>
@@ -908,6 +914,7 @@
                 <tr>
                   <th>Campaign</th>
                   <th>Region</th>
+                  <th>Country</th>
                   <th>Month</th>
                   <th>Type</th>
                   <th>Sent</th>
@@ -942,6 +949,7 @@
                 <tr>
                   <th>Form</th>
                   <th>Region</th>
+                  <th>Country</th>
                   <th>Month</th>
                   <th>Submissions</th>
                   <th>Unique</th>
@@ -971,6 +979,7 @@
                   <th>Quarter</th>
                   <th>Month</th>
                   <th>Region</th>
+                  <th>Country</th>
                   <th>Total</th>
                   <th>Mobile</th>
                   <th>Display</th>
@@ -1067,15 +1076,20 @@
             if (productIndex === -1) return row.value ?? null;
             return row.products?.[productIndex] ?? null;
           },
-          scope = () =>
-            data
+          scope = () => {
+            const selectedCountry = $("country").value,
+              hasCountryTotals = data.some((row) => row.country === null);
+            return data
               .filter(
                 (x) =>
                   ($("year").value === "All Years" ||
                     x.year === $("year").value) &&
                   ($("r").value === "All Regions" || x.r === $("r").value) &&
                   ($("m").value === "All Months" || x.m === $("m").value) &&
-                  ($("q").value === "All Quarters" || x.q === $("q").value),
+                  ($("q").value === "All Quarters" || x.q === $("q").value) &&
+                  (selectedCountry === "All Countries"
+                    ? !hasCountryTotals || x.country === null
+                    : x.country === selectedCountry),
               )
               .map((x) => ({
                 ...x,
@@ -1087,20 +1101,30 @@
                     "optOut",
                     "neither",
                     "newContacts",
+                    "newSubscribers",
+                    "newUnsubscribers",
                   ].map((metric) => [metric, metricValue(x, metric)]),
                 ),
-              })),
+              }));
+          },
           sum = (key, rows = scope()) =>
             rows.reduce((total, row) => total + (row[key] ?? 0), 0),
-          selectedRows = (rows) =>
-            rows.filter(
+          selectedRows = (rows) => {
+            const selectedCountry = $("country").value,
+              hasCountryTotals = rows.some((row) => row.country === null);
+            return rows.filter(
               (x) =>
                 ($("year").value === "All Years" ||
                   x.year === $("year").value) &&
                 ($("r").value === "All Regions" || x.region === $("r").value) &&
                 ($("m").value === "All Months" || x.month === $("m").value) &&
-                ($("q").value === "All Quarters" || x.quarter === $("q").value),
-            ),
+                ($("q").value === "All Quarters" ||
+                  x.quarter === $("q").value) &&
+                (selectedCountry === "All Countries"
+                  ? !hasCountryTotals || x.country === null
+                  : x.country === selectedCountry),
+            );
+          },
           k = (l, v) =>
             `<div class="k"><div class="kl">${l}</div><div class="kv">${v}</div></div>`;
         function escapeHtml(value) {
@@ -1122,6 +1146,42 @@
           [...new Set(values)].forEach((value) => {
             select.add(new Option(value, value));
           });
+        }
+        function refreshCountryFilter() {
+          const currentCountry = $("country").value,
+            selectedRegion = $("r").value,
+            rows = [
+              ...data,
+              ...estoreData,
+              ...Object.values(engagementData).flat(),
+              ...Object.values(marketableBreakdownData).flat(),
+              ...Object.values(audienceData).flat(),
+              ...campaignsData,
+              ...formsData,
+            ],
+            countries = [
+              ...new Set(
+                rows
+                  .filter((row) => {
+                    const country = String(row.country ?? "")
+                        .trim()
+                        .toLowerCase(),
+                      region = row.region ?? row.r;
+                    return (
+                      country &&
+                      country !== "all" &&
+                      country !== "all countries" &&
+                      (selectedRegion === "All Regions" ||
+                        region === selectedRegion)
+                    );
+                  })
+                  .map((row) => String(row.country).trim()),
+              ),
+            ].sort((a, b) => a.localeCompare(b, "en-GB"));
+          populateFilter("country", "All Countries", countries);
+          if (countries.includes(currentCountry)) {
+            $("country").value = currentCountry;
+          }
         }
         function bars(id, a) {
           let mx = Math.max(...a.map((x) => x[1]), 1);
@@ -1270,6 +1330,7 @@
               !Array.isArray(payload.estoreMetrics) ||
               !payload.engagement ||
               !Array.isArray(payload.engagement.engaged) ||
+              !Array.isArray(payload.engagement.touched) ||
               !Array.isArray(payload.engagementMetrics) ||
               !payload.marketableBreakdown ||
               !Array.isArray(payload.marketableBreakdown.i4b) ||
@@ -1312,6 +1373,7 @@
               "All Regions",
               data.map((record) => record.r),
             );
+            refreshCountryFilter();
             const includedSheets = payload.sheetAudit.filter(
                 (sheet) =>
                   sheet.status === "loaded" ||
@@ -1322,7 +1384,7 @@
                   sheet.status !== "loaded" &&
                   sheet.status !== "included-placeholder",
               );
-            status.textContent = `Loaded ${data.length} metric region-period rows, ${estoreData.length} eStore rows, ${engagementData.engaged.length} engaged-contact rows, ${marketableBreakdownData.i4b.length} I4B rows, ${marketableBreakdownData.withoutI4B.length} without-I4B rows, ${marketableBreakdownData.nonEstore.length} non-eStore rows, ${campaignsData.length} campaigns, ${formsData.length} forms, and ${Object.values(audienceData).reduce((total, rows) => total + rows.length, 0)} audience rows. NA, N/A, and Blank cells are ignored, not counted as zero. ${payload.missingDatabaseRows} database region-periods have no numeric total. ${includedSheets.length} of ${payload.sheetAudit.length} workbook sheets are included; ${excludedSheets.length} blank or unmapped sheets are excluded.`;
+            status.textContent = `Loaded ${data.filter((row) => row.country === null).length} metric region-period totals, ${estoreData.filter((row) => row.country === null).length} eStore region-period totals, ${engagementData.engaged.filter((row) => row.country === null).length} engaged-contact region-period totals, ${engagementData.touched.filter((row) => row.country === null).length} touched-contact region-period totals, ${marketableBreakdownData.i4b.filter((row) => row.country === null).length} I4B region-period totals, ${marketableBreakdownData.withoutI4B.filter((row) => row.country === null).length} without-I4B region-period totals, ${marketableBreakdownData.nonEstore.filter((row) => row.country === null).length} non-eStore region-period totals, ${campaignsData.length} campaigns, ${formsData.length} forms, and ${Object.values(audienceData).reduce((total, rows) => total + rows.filter((row) => row.country === null).length, 0)} audience region-period totals. NA, N/A, and Blank cells are ignored, not counted as zero. ${payload.missingDatabaseRows} database region-periods have no numeric total. ${includedSheets.length} of ${payload.sheetAudit.length} workbook sheets are included; ${excludedSheets.length} blank or unmapped sheets are excluded.`;
             status.title = payload.sheetAudit
               .filter((sheet) => sheet.status !== "loaded")
               .map(
@@ -1383,6 +1445,16 @@
             ["Opt-out", optout, "optOut"],
             ["Neither", neither, "neither"],
             ["New Contacts", sum("newContacts", scoped), "newContacts"],
+            [
+              "New Subscribers",
+              sum("newSubscribers", scoped),
+              "newSubscribers",
+            ],
+            [
+              "New Unsubscribers",
+              sum("newUnsubscribers", scoped),
+              "newUnsubscribers",
+            ],
           ]
             .map((x) =>
               k(
@@ -1435,17 +1507,30 @@
             unavailable("trend", "No data for this filter.");
           }
           const engagedRows = selectedRows(engagementData.engaged || []);
-          if (engagedRows.length) {
-            bars("engage", [
-              [
-                "Engaged Contacts",
-                engagedRows.reduce(
-                  (total, row) =>
-                    total + (engagementMetricValue(row, "engaged") ?? 0),
-                  0,
-                ),
-              ],
+          const touchedRows = selectedRows(engagementData.touched || []),
+            engagementBars = [];
+          if (engagedRows.length && availableEngagementMetrics.has("engaged")) {
+            engagementBars.push([
+              "Engaged Contacts",
+              engagedRows.reduce(
+                (total, row) =>
+                  total + (engagementMetricValue(row, "engaged") ?? 0),
+                0,
+              ),
             ]);
+          }
+          if (touchedRows.length && availableEngagementMetrics.has("touched")) {
+            engagementBars.push([
+              "Touched Contacts",
+              touchedRows.reduce(
+                (total, row) =>
+                  total + (engagementMetricValue(row, "touched") ?? 0),
+                0,
+              ),
+            ]);
+          }
+          if (engagementBars.length) {
+            bars("engage", engagementBars);
           } else {
             unavailable("engage", "No engagement data for this filter.");
           }
@@ -1871,13 +1956,13 @@
                 .forEach(([metric, label]) => {
                   const productValues = row[`${metric}Products`] || [];
                   explorerRows.push(
-                    `<tr><td>${label}</td><td>${escapeHtml(row.q)}</td><td>${escapeHtml(row.m)}</td><td>${escapeHtml(row.r)}</td><td>${fmt(row[metric])}</td>${PRODUCTS.map((_, index) => `<td>${productIndex !== -1 && productIndex !== index ? "--" : productValues[index] == null ? "Not available" : fmt(productValues[index])}</td>`).join("")}</tr>`,
+                    `<tr><td>${label}</td><td>${escapeHtml(row.q)}</td><td>${escapeHtml(row.m)}</td><td>${escapeHtml(row.r)}</td><td>${escapeHtml(row.country ?? "All Countries")}</td><td>${fmt(row[metric])}</td>${PRODUCTS.map((_, index) => `<td>${productIndex !== -1 && productIndex !== index ? "--" : productValues[index] == null ? "Not available" : fmt(productValues[index])}</td>`).join("")}</tr>`,
                   );
                 });
             });
           $("explorerRows").innerHTML = scoped.length
             ? explorerRows.slice(0, 100).join("")
-            : '<tr><td colspan="11">No data for this filter.</td></tr>';
+            : '<tr><td colspan="12">No data for this filter.</td></tr>';
           window.__campaignRows = campaignRows
             .filter(
               (row) =>
@@ -1891,7 +1976,7 @@
             )
             .map((row) => {
               const rate = campaignRate(row);
-              return `<tr><td>${escapeHtml(row.campaign)}</td><td>${escapeHtml(row.region)}</td><td>${escapeHtml(row.month)}</td><td>${escapeHtml(row.type)}</td><td>${displayAvailable(row.sent)}</td><td>${displayAvailable(row.delivered)}</td><td>${rate.open === null ? "Not available" : rate.open.toFixed(1) + "%"}</td><td>${rate.ctr === null ? "Not available" : rate.ctr.toFixed(1) + "%"}</td></tr>`;
+              return `<tr><td>${escapeHtml(row.campaign)}</td><td>${escapeHtml(row.region)}</td><td>${escapeHtml(row.country === "All" ? "All Countries" : (row.country ?? "Not available"))}</td><td>${escapeHtml(row.month)}</td><td>${escapeHtml(row.type)}</td><td>${displayAvailable(row.sent)}</td><td>${displayAvailable(row.delivered)}</td><td>${rate.open === null ? "Not available" : rate.open.toFixed(1) + "%"}</td><td>${rate.ctr === null ? "Not available" : rate.ctr.toFixed(1) + "%"}</td></tr>`;
             });
           window.__formRows = formRows
             .filter(
@@ -1907,7 +1992,7 @@
             )
             .map(
               (row) =>
-                `<tr><td>${escapeHtml(row.name)}</td><td>${escapeHtml(row.region)}</td><td>${escapeHtml(row.month)}</td><td>${displayAvailable(row.submissions)}</td><td>${displayAvailable(row.uniqueSubmissions)}</td><td>${displayAvailable(row.newContacts)}</td></tr>`,
+                `<tr><td>${escapeHtml(row.name)}</td><td>${escapeHtml(row.region)}</td><td>${escapeHtml(row.country === "All" ? "All Countries" : (row.country ?? "Not available"))}</td><td>${escapeHtml(row.month)}</td><td>${displayAvailable(row.submissions)}</td><td>${displayAvailable(row.uniqueSubmissions)}</td><td>${displayAvailable(row.newContacts)}</td></tr>`,
             );
           renderPaginatedTable("campaign");
           renderPaginatedTable("form");
@@ -1968,7 +2053,8 @@
         }
         document.querySelectorAll("select").forEach(
           (x) =>
-            (x.onchange = () => {
+            (x.onchange = (event) => {
+              if (event.target.id === "r") refreshCountryFilter();
               resetTablePages();
               render();
             }),
@@ -1989,6 +2075,7 @@
           document
             .querySelectorAll("select")
             .forEach((x) => (x.selectedIndex = 0));
+          refreshCountryFilter();
           resetTablePages();
           render();
         };

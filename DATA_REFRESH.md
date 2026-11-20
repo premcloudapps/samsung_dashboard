@@ -12,12 +12,19 @@ python build_dashboard_data.py "C:\path\to\updated-workbook.xlsx"
 The converter checks every workbook sheet and ignores `NA`, `N/A`, and `Blank`
 values rather than treating them as zero. Country rows are grouped by region;
 when a region has an `All` summary row, the summary is used instead of adding
-the country rows a second time. It imports populated database, consent,
-marketable, campaign, form, eStore, Engagement, and audience data. The
-dashboard status tooltip identifies sheets with repeated placeholder values
+the country rows a second time. Country rows are also retained for the Country
+filter. It imports populated database, consent, New
+Subscribers, New UnSubscribers, marketable, campaign, form, eStore, Engaged
+Contacts, Touched Contacts, and audience data. The dashboard status tooltip identifies sheets
+with repeated placeholder values
 and sheets with no numeric data. Product columns include `Blank` when the
 workbook provides it. Review converter warnings for rows with missing keys and
 the dashboard data-status note after each refresh.
+
+The dashboard's Country filter uses country-specific rows where available and
+preserves region totals for the `All Countries` selection. It applies to
+country-bearing metrics, campaign and form details, eStore, engagement, and
+audience dimensions.
 
 Serve the dashboard from a web server; opening `index.html` directly from disk
 does not allow the browser to fetch its adjacent JSON file. Keep the hosting
