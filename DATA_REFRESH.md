@@ -13,9 +13,10 @@ The converter checks every workbook sheet and ignores `NA`, `N/A`, and `Blank`
 values rather than treating them as zero. Country rows are grouped by region;
 when a region has an `All` summary row, the summary is used instead of adding
 the country rows a second time. Country rows are also retained for the Country
-filter. It imports populated database, consent, New
-Subscribers, New UnSubscribers, marketable, campaign, form, eStore, Engaged
-Contacts, Touched Contacts, and audience data. The dashboard status tooltip identifies sheets
+filter. The converter normalizes the known `Beligum` spelling to `Belgium`.
+It imports populated database, consent, New Subscribers, New UnSubscribers,
+marketable, campaign, form, eStore, Engaged Contacts, Touched Contacts, and
+audience data. The dashboard status tooltip identifies sheets
 with repeated placeholder values
 and sheets with no numeric data. Product columns include `Blank` when the
 workbook provides it. Review converter warnings for rows with missing keys and

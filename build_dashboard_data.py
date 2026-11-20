@@ -31,6 +31,7 @@ MONTHS = [
     "November",
     "December",
 ]
+COUNTRY_ALIASES = {"beligum": "Belgium"}
 
 METRIC_SHEETS = {
     "Total Database": ("db", "Total Database"),
@@ -97,6 +98,11 @@ FORM_SHEET = "Form submission"
 
 def normalized(value):
     return " ".join(str(value or "").strip().lower().split())
+
+
+def country_name(value):
+    name = str(value or "").strip()
+    return COUNTRY_ALIASES.get(name.casefold(), name)
 
 
 def number(value, location, blank_as_zero=False):
@@ -183,11 +189,9 @@ def rows_for_metric(workbook, sheet_name, metric_name):
         if any(cell is None or cell == "" for cell in key_cells):
             raise ValueError(f"Sheet {sheet_name!r}, row {row_number}: missing key.")
         year, quarter, month, region = [str(cell).strip() for cell in key_cells]
-        country = (
-            str(row[country_index]).strip()
-            if country_index is not None
-            and country_index < len(row)
-            and row[country_index] is not None
+        country = country_name(
+            row[country_index]
+            if country_index is not None and country_index < len(row)
             else ""
         )
         if region not in REGIONS and country in REGIONS:
@@ -310,11 +314,9 @@ def rows_for_dimension(workbook, sheet_name, category_name, metric_name):
         if any(value is None or value == "" for value in key_values):
             raise ValueError(f"Sheet {sheet_name!r}, row {row_number}: missing key.")
         country_index = header_indexes.get("country")
-        country = (
-            str(row[country_index]).strip()
-            if country_index is not None
-            and country_index < len(row)
-            and row[country_index] is not None
+        country = country_name(
+            row[country_index]
+            if country_index is not None and country_index < len(row)
             else ""
         )
         if region not in REGIONS and country in REGIONS:
@@ -494,7 +496,7 @@ def read_detail_sheet(workbook, sheet_name, kind):
                     "quarter": str(get(quarter_header) or "").strip(),
                     "month": str(get("month") or "").strip(),
                     "region": str(get("region") or "").strip(),
-                    "country": str(get("country") or "").strip() or None,
+                    "country": country_name(get("country")) or None,
                     "type": str(get("type") or "").strip(),
                     "campaign": str(get(campaign_name_header) or "").strip(),
                     "sent": nullable_number(get("total_sent"), f"{sheet_name} row {row_number}"),
@@ -511,7 +513,7 @@ def read_detail_sheet(workbook, sheet_name, kind):
                     "quarter": str(get(quarter_header) or "").strip(),
                     "month": str(get("month") or "").strip(),
                     "region": str(get("region") or "").strip(),
-                    "country": str(get("country") or "").strip() or None,
+                    "country": country_name(get("country")) or None,
                     "name": str(get("form name") or "").strip(),
                     "type": str(get("type") or "").strip(),
                     "submissions": nullable_number(get("total submission"), f"{sheet_name} row {row_number}"),
