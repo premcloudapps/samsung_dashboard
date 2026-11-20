@@ -1037,6 +1037,7 @@
           $ = (x) => document.getElementById(x),
           fmt = (x) => Math.round(x).toLocaleString("en-GB");
         M.forEach((x) => $("m").add(new Option(x, x)));
+        $("m").value = "October";
         let data = [],
           estoreData = [],
           availableEstoreMetrics = new Set(),
